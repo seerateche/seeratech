@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+
+    <!-- ── Mobile viewport – CRITICAL for Android WebView ── -->
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0, maximum-scale=1.0,
+                   user-scalable=no, viewport-fit=cover" />
+
+    <!-- Prevent iOS/Android callouts on long-press -->
+    <meta name="format-detection" content="telephone=no, email=no, address=no" />
+
+    <!-- Android status bar color -->
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="msapplication-navbutton-color" content="#0f172a" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+
+    <!-- PWA manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <meta name="description" content="Seera Platform v4 - منصة إدارة مزودي الخدمة" />
+    <title>Seera Platform</title>
+
+    <!-- IBM Plex Sans Arabic — RTL UI font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Prevent blank white flash before React mounts -->
+    <style>
+      html, body, #root {
+        background-color: #0f172a;
+        min-height: 100%;
+        margin: 0; padding: 0;
+      }
+      /* Hide until React hydrates */
+      #root:empty::before {
+        content: '';
+        display: block;
+        width: 40px; height: 40px;
+        border: 3px solid rgba(99,102,241,0.2);
+        border-top-color: #6366f1;
+        border-radius: 50%;
+        animation: spin .8s linear infinite;
+        position: fixed;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+      }
+      @keyframes spin { to { transform: translate(-50%,-50%) rotate(360deg); } }
+    </style>
+  </head>
+  <body class="bg-surface text-slate-100 antialiased overflow-x-hidden">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
