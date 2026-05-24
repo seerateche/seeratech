@@ -1,5 +1,5 @@
 // ============================================================
-// SEERA PLATFORM v4 - React Entry Point + Capacitor Init
+// SEERA PLATFORM v4 - React Entry Point + Capacitor 5 Init
 // ============================================================
 import React from 'react';
 import ReactDOM from 'react-dom/client';
@@ -14,35 +14,37 @@ import { Toaster } from 'react-hot-toast';
 import './index.css';
 
 // Pages
-import { LoginPage }           from './pages/auth/LoginPage';
-import { DashboardLayout }     from './components/layout/DashboardLayout';
-import { GodModeDashboard }    from './pages/god-mode/GodModeDashboard';
-import { CompanyDashboard }    from './pages/company/CompanyDashboard';
-import { DevicesPage }         from './pages/devices/DevicesPage';
-import { MikroTikPage }        from './pages/devices/MikroTikPage';
-import { VouchersPage }        from './pages/devices/VouchersPage';
-import { AttendancePage }      from './pages/devices/AttendancePage';
-import { CctvPage }            from './pages/devices/CctvPage';
-import { IspQuotaView }        from './pages/isp/IspQuotaView';
-import { AuthGuard }           from './components/auth/AuthGuard';
-import { UserRole }            from '@sira/shared';
+import { LoginPage }        from './pages/auth/LoginPage';
+import { DashboardLayout }  from './components/layout/DashboardLayout';
+import { GodModeDashboard } from './pages/god-mode/GodModeDashboard';
+import { CompanyDashboard } from './pages/company/CompanyDashboard';
+import { DevicesPage }      from './pages/devices/DevicesPage';
+import { MikroTikPage }     from './pages/devices/MikroTikPage';
+import { VouchersPage }     from './pages/devices/VouchersPage';
+import { AttendancePage }   from './pages/devices/AttendancePage';
+import { CctvPage }         from './pages/devices/CctvPage';
+import { IspQuotaView }     from './pages/isp/IspQuotaView';
+import { AuthGuard }        from './components/auth/AuthGuard';
+import { UserRole }         from '@sira/shared';
 
-// ── Capacitor Runtime Init ────────────────────────────────────
-async function initCapacitor() {
-  // Only runs when bundled as a native app (window.Capacitor is set)
-  if (!(window as any).Capacitor) return;
+// ── Capacitor 5 Runtime Init ──────────────────────────────────
+async function initCapacitor(): Promise<void> {
+  const isNative = !!(window as any).Capacitor?.isNativePlatform?.();
+  if (!isNative) return;
 
   try {
+    // StatusBar (Capacitor 5)
     const { StatusBar, Style } = await import('@capacitor/status-bar');
-    await StatusBar.setStyle({ style: Style.Dark });
+    await StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
     await StatusBar.setBackgroundColor({ color: '#0f172a' }).catch(() => {});
 
+    // SplashScreen
     const { SplashScreen } = await import('@capacitor/splash-screen');
-    await SplashScreen.hide({ fadeOutDuration: 400 });
+    await SplashScreen.hide({ fadeOutDuration: 400 }).catch(() => {});
 
-    // Handle Android hardware back button
+    // Hardware back button
     const { App } = await import('@capacitor/app');
-    App.addListener('backButton', ({ canGoBack }) => {
+    await App.addListener('backButton', ({ canGoBack }: { canGoBack: boolean }) => {
       if (canGoBack) {
         window.history.back();
       } else {
@@ -50,35 +52,31 @@ async function initCapacitor() {
       }
     });
 
-    // Network change events
+    // Network monitor
     const { Network } = await import('@capacitor/network');
-    Network.addListener('networkStatusChange', (status) => {
-      if (!status.connected) {
-        import('react-hot-toast').then(({ default: toast }) =>
-          toast.error('لا يوجد اتصال بالإنترنت', { id: 'offline', duration: Infinity })
-        );
-      } else {
-        import('react-hot-toast').then(({ default: toast }) =>
-          toast.dismiss('offline')
-        );
-      }
+    await Network.addListener('networkStatusChange', (status: { connected: boolean }) => {
+      import('react-hot-toast').then(({ default: toast }) => {
+        if (!status.connected) {
+          toast.error('لا يوجد اتصال بالإنترنت', { id: 'offline', duration: Infinity });
+        } else {
+          toast.dismiss('offline');
+        }
+      });
     });
 
-    console.log('✓ Capacitor initialized');
+    console.log('✓ Capacitor 5 initialized');
   } catch (err) {
-    // Not running as native app — ignore
-    console.debug('Capacitor not available (running in browser)');
+    console.debug('Capacitor init skipped:', err);
   }
 }
 
-// ── React Query Client ────────────────────────────────────────
+// ── React Query ───────────────────────────────────────────────
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
       retry: 2,
       refetchOnWindowFocus: false,
-      // Shorter timeout for mobile networks
       networkMode: 'offlineFirst',
     },
     mutations: {
@@ -89,17 +87,12 @@ const queryClient = new QueryClient({
 
 // ── Router ────────────────────────────────────────────────────
 const router = createBrowserRouter([
-  {
-    path: '/login',
-    element: <LoginPage />,
-  },
+  { path: '/login', element: <LoginPage /> },
   {
     path: '/',
     element: (
       <AuthGuard>
-        <DashboardLayout>
-          <Outlet />
-        </DashboardLayout>
+        <DashboardLayout><Outlet /></DashboardLayout>
       </AuthGuard>
     ),
     children: [
@@ -112,26 +105,23 @@ const router = createBrowserRouter([
           </AuthGuard>
         ),
       },
-      { path: 'dashboard',                       element: <CompanyDashboard /> },
-      { path: 'devices',                         element: <DevicesPage /> },
-      { path: 'devices/:deviceId/mikrotik',      element: <MikroTikPage /> },
-      { path: 'vouchers',                        element: <VouchersPage /> },
-      { path: 'attendance',                      element: <AttendancePage /> },
-      { path: 'cctv',                            element: <CctvPage /> },
-      { path: 'isp-quota',                       element: <IspQuotaView /> },
+      { path: 'dashboard',                  element: <CompanyDashboard /> },
+      { path: 'devices',                    element: <DevicesPage /> },
+      { path: 'devices/:deviceId/mikrotik', element: <MikroTikPage /> },
+      { path: 'vouchers',                   element: <VouchersPage /> },
+      { path: 'attendance',                 element: <AttendancePage /> },
+      { path: 'cctv',                       element: <CctvPage /> },
+      { path: 'isp-quota',                  element: <IspQuotaView /> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },
 ]);
 
 // ── Bootstrap ─────────────────────────────────────────────────
-async function bootstrap() {
-  // Init Capacitor before React mount so StatusBar + SplashScreen
-  // are configured before the first render paint
+async function bootstrap(): Promise<void> {
   await initCapacitor();
 
-  const rootEl = document.getElementById('root')!;
-  ReactDOM.createRoot(rootEl).render(
+  ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
@@ -140,15 +130,15 @@ async function bootstrap() {
           containerStyle={{ top: 'calc(env(safe-area-inset-top, 0px) + 8px)' }}
           toastOptions={{
             style: {
-              background: '#1e293b',
-              color: '#f1f5f9',
-              border: '1px solid #334155',
-              fontFamily: 'IBM Plex Sans Arabic, sans-serif',
-              direction: 'rtl',
-              fontSize: '14px',
-              padding: '12px 16px',
+              background:   '#1e293b',
+              color:        '#f1f5f9',
+              border:       '1px solid #334155',
+              fontFamily:   'IBM Plex Sans Arabic, sans-serif',
+              direction:    'rtl',
+              fontSize:     '14px',
+              padding:      '12px 16px',
               borderRadius: '12px',
-              maxWidth: '90vw',
+              maxWidth:     '90vw',
             },
             success: { iconTheme: { primary: '#22c55e', secondary: '#1e293b' } },
             error:   { iconTheme: { primary: '#ef4444', secondary: '#1e293b' }, duration: 4000 },

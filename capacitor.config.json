@@ -14,7 +14,8 @@
   "android": {
     "backgroundColor": "#0f172a",
     "allowMixedContent": true,
-    "minWebViewVersion": 60
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
   },
   "plugins": {
     "SplashScreen": {
@@ -26,7 +27,7 @@
       "splashImmersive": true
     },
     "StatusBar": {
-      "style": "Dark",
+      "style": "DARK",
       "backgroundColor": "#0f172a"
     }
   }
