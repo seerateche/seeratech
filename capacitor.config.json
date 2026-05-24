@@ -1,34 +1,13 @@
 {
-  "appId": "io.seera.platform.v4",
-  "appName": "Seera Platform",
+  "appId": "com.seera.platform",
+  "appName": "Sira Platform",
   "webDir": "apps/web/dist",
   "bundledWebRuntime": false,
-  "server": {
-    "androidScheme": "https",
-    "allowNavigation": [
-      "localhost",
-      "10.0.2.2",
-      "192.168.*.*"
-    ]
-  },
-  "android": {
-    "backgroundColor": "#0f172a",
-    "allowMixedContent": true,
-    "captureInput": true,
-    "webContentsDebuggingEnabled": false
-  },
   "plugins": {
     "SplashScreen": {
-      "launchShowDuration": 2000,
+      "launchShowDuration": 3000,
       "launchAutoHide": true,
-      "backgroundColor": "#0f172a",
-      "showSpinner": false,
-      "splashFullScreen": true,
-      "splashImmersive": true
-    },
-    "StatusBar": {
-      "style": "DARK",
-      "backgroundColor": "#0f172a"
+      "backgroundColor": "#ffffff"
     }
   }
 }
