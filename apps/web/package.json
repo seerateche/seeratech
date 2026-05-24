@@ -30,7 +30,7 @@
     "@capacitor/status-bar": "^6.0.0",
     "@capacitor/splash-screen": "^6.0.0",
     "@capacitor/network": "^6.0.0",
-    "@capacitor/app": "^6.0.0"
+    "@capacitor/app": "^6.1.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.55",
@@ -44,5 +44,6 @@
     "typescript": "^5.3.3",
     "terser": "^5.27.0",
     "@capacitor/cli": "^6.1.2"
-  }
+  },
+  "type": "module"
 }
