@@ -1,9 +1,39 @@
+# ── Node ──────────────────────────────────────────────────────
 node_modules/
-dist/
-build/
+.npm/
+
+# ── Build outputs ─────────────────────────────────────────────
+apps/web/dist/
+apps/api/dist/
+*.js.map
+
+# ── Environment ───────────────────────────────────────────────
 .env
-.env.*
+.env.local
+.env.*.local
+!.env.example
+
+# ── Capacitor / Android ───────────────────────────────────────
+# DO NOT ignore android/ — Appflow needs it committed OR will generate it
+# android/app/build/
+# .gradle/
+
+# ── Logs ──────────────────────────────────────────────────────
 *.log
-apps/web/android/
-apps/web/ios/
+npm-debug.log*
+
+# ── OS ────────────────────────────────────────────────────────
 .DS_Store
+Thumbs.db
+
+# ── IDE ───────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+
+# ── Streams / uploads (runtime only) ─────────────────────────
+/tmp/sira-*
+
+# ── IMPORTANT: DO NOT ignore package-lock.json ───────────────
+# package-lock.json MUST be committed for npm ci to work
+# !package-lock.json  ← this line intentionally absent

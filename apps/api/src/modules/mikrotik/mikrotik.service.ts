@@ -1,11 +1,12 @@
 // ============================================================
 // SIRA PLATFORM v4 - MikroTik Service (Direct API / No RADIUS)
+// node-ftp → basic-ftp (modern, Promise-based, typed)
 // ============================================================
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Inject } from '@nestjs/common';
 import { RouterOSAPI } from 'node-routeros';
-import * as FTP from 'node-ftp';
+import * as ftp from 'basic-ftp';
 import * as AdmZip from 'adm-zip';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -22,15 +23,9 @@ import {
   VoucherStatus,
 } from '@sira/shared';
 
-export interface RouterOSConnection {
-  api: RouterOSAPI;
-  deviceId: string;
-}
-
 @Injectable()
 export class MikroTikService {
   private readonly logger = new Logger(MikroTikService.name);
-  // Active connection pool
   private readonly connectionPool = new Map<string, RouterOSAPI>();
 
   constructor(
@@ -42,11 +37,9 @@ export class MikroTikService {
   // ── Connection Management ─────────────────────────────────
 
   private async getConnection(deviceId: string): Promise<RouterOSAPI> {
-    // Return pooled connection if alive
     const existing = this.connectionPool.get(deviceId);
     if (existing) {
       try {
-        // Ping test
         await (existing as any).write('/system/identity/print');
         return existing;
       } catch {
@@ -54,7 +47,6 @@ export class MikroTikService {
       }
     }
 
-    // Load device from DB
     const [device] = await this.db
       .select()
       .from(devices)
@@ -63,7 +55,6 @@ export class MikroTikService {
 
     if (!device) throw new NotFoundException(`الجهاز ${deviceId} غير موجود`);
 
-    // Decrypt credentials in-memory
     const creds = this.security.decryptCredentials(
       device.encryptedUsername,
       device.encryptedPassword,
@@ -74,10 +65,10 @@ export class MikroTikService {
     const host = device.useVpn && device.vpnIp ? device.vpnIp : device.host;
     const api = new RouterOSAPI({
       host,
-      port: device.apiPort || 8728,
-      user: creds.username,
-      password: creds.password,
-      timeout: 10,
+      port:      device.apiPort || 8728,
+      user:      creds.username,
+      password:  creds.password,
+      timeout:   10,
       keepalive: true,
     });
 
@@ -85,15 +76,12 @@ export class MikroTikService {
       await api.connect();
       this.connectionPool.set(deviceId, api);
       this.logger.log(`✓ Connected to MikroTik [${device.name}] at ${host}`);
-
-      // Update device status
       await this.db
         .update(devices)
         .set({ status: 'online', lastSeenAt: new Date() })
         .where(eq(devices.id, deviceId));
-
       return api;
-    } catch (err) {
+    } catch (err: any) {
       await this.db
         .update(devices)
         .set({ status: 'error' })
@@ -105,9 +93,7 @@ export class MikroTikService {
   async disconnect(deviceId: string): Promise<void> {
     const conn = this.connectionPool.get(deviceId);
     if (conn) {
-      try {
-        await conn.close();
-      } catch {}
+      try { await conn.close(); } catch {}
       this.connectionPool.delete(deviceId);
     }
   }
@@ -116,31 +102,28 @@ export class MikroTikService {
 
   async getSystemStats(deviceId: string): Promise<MikroTikStats> {
     const api = await this.getConnection(deviceId);
-
     const [resources, identity, routerboard, activeUsers] = await Promise.all([
       api.write('/system/resource/print'),
       api.write('/system/identity/print'),
       api.write('/system/routerboard/print').catch(() => [{}]),
       api.write('/ip/hotspot/active/print').catch(() => []),
     ]);
-
     const res = resources[0] as any;
-    const id = identity[0] as any;
-    const rb = routerboard[0] as any;
+    const id  = identity[0]   as any;
+    const rb  = routerboard[0] as any;
 
-    // Save stats snapshot
     const stats: MikroTikStats = {
-      uptime: res['uptime'] || '0s',
-      cpuLoad: parseInt(res['cpu-load'] || '0'),
-      memoryUsed: parseInt(res['total-memory'] || '0') - parseInt(res['free-memory'] || '0'),
-      memoryTotal: parseInt(res['total-memory'] || '0'),
-      hddUsed: parseInt(res['total-hdd-space'] || '0') - parseInt(res['free-hdd-space'] || '0'),
-      hddTotal: parseInt(res['total-hdd-space'] || '0'),
-      activeHotspotUsers: activeUsers.length,
-      totalInterfaces: 0,
-      boardName: rb['board-name'] || id['name'] || 'Unknown',
-      version: res['version'] || 'Unknown',
-      serialNumber: rb['serial-number'] || 'N/A',
+      uptime:             res['uptime']        || '0s',
+      cpuLoad:            parseInt(res['cpu-load']        || '0'),
+      memoryUsed:         parseInt(res['total-memory']    || '0') - parseInt(res['free-memory']    || '0'),
+      memoryTotal:        parseInt(res['total-memory']    || '0'),
+      hddUsed:            parseInt(res['total-hdd-space'] || '0') - parseInt(res['free-hdd-space'] || '0'),
+      hddTotal:           parseInt(res['total-hdd-space'] || '0'),
+      activeHotspotUsers: (activeUsers as any[]).length,
+      totalInterfaces:    0,
+      boardName:          rb['board-name']    || id['name'] || 'Unknown',
+      version:            res['version']      || 'Unknown',
+      serialNumber:       rb['serial-number'] || 'N/A',
     };
 
     await this.db
@@ -154,33 +137,31 @@ export class MikroTikService {
   // ── Hotspot Profiles ──────────────────────────────────────
 
   async getHotspotProfiles(deviceId: string): Promise<HotspotProfile[]> {
-    const api = await this.getConnection(deviceId);
+    const api      = await this.getConnection(deviceId);
     const profiles = await api.write('/ip/hotspot/user/profile/print');
-
     return (profiles as any[]).map((p) => ({
-      name: p['name'],
+      name:         p['name'],
       sessionTimeout: p['session-timeout'] || '0s',
-      idleTimeout: p['idle-timeout'] || '0s',
-      rateLimit: p['rate-limit'] || '',
-      sharedUsers: parseInt(p['shared-users'] || '1'),
+      idleTimeout:  p['idle-timeout']      || '0s',
+      rateLimit:    p['rate-limit']         || '',
+      sharedUsers:  parseInt(p['shared-users'] || '1'),
     }));
   }
 
-  // ── Voucher Engine (Direct to RouterOS, No RADIUS) ────────
+  // ── Voucher Engine (Direct to RouterOS) ───────────────────
 
   async generateAndPushVouchers(params: {
-    deviceId: string;
-    companyId: string;
-    batchName: string;
+    deviceId:   string;
+    companyId:  string;
+    batchName:  string;
     profileName: string;
-    count: number;
-    prefix?: string;
-    comment?: string;
+    count:      number;
+    prefix?:    string;
+    comment?:   string;
     createdBy?: string;
   }): Promise<{ batchId: string; vouchers: string[] }> {
     const api = await this.getConnection(params.deviceId);
 
-    // Verify profile exists on the router
     const profiles = await api.write('/ip/hotspot/user/profile/print', [
       `?name=${params.profileName}`,
     ]);
@@ -190,34 +171,30 @@ export class MikroTikService {
       );
     }
 
-    // Generate voucher codes
     const codes: string[] = [];
     const prefix = params.prefix || 'SIRA';
     for (let i = 0; i < params.count; i++) {
-      // Format: PREFIX-XXXXXXXX (8 random alphanumeric)
       const random = Math.random().toString(36).substring(2, 10).toUpperCase();
       codes.push(`${prefix}-${random}`);
     }
 
-    // Create batch record
     const [batch] = await this.db
       .insert(voucherBatches)
       .values({
-        companyId: params.companyId,
-        deviceId: params.deviceId,
-        name: params.batchName,
+        companyId:   params.companyId,
+        deviceId:    params.deviceId,
+        name:        params.batchName,
         profileName: params.profileName,
-        totalCount: params.count,
-        createdBy: params.createdBy,
+        totalCount:  params.count,
+        createdBy:   params.createdBy,
       })
       .returning();
 
-    // Push to RouterOS in chunks of 50 to avoid timeout
     const chunkSize = 50;
     const routerosIds: Record<string, string> = {};
 
     for (let i = 0; i < codes.length; i += chunkSize) {
-      const chunk = codes.slice(i, i + chunkSize);
+      const chunk    = codes.slice(i, i + chunkSize);
       const promises = chunk.map(async (code) => {
         const result = await api.write('/ip/hotspot/user/add', [
           `=name=${code}`,
@@ -231,49 +208,34 @@ export class MikroTikService {
       await Promise.all(promises);
     }
 
-    // Save all vouchers to PostgreSQL
     const voucherRecords = codes.map((code) => ({
-      batchId: batch.id,
-      companyId: params.companyId,
-      deviceId: params.deviceId,
+      batchId:     batch.id,
+      companyId:   params.companyId,
+      deviceId:    params.deviceId,
       code,
       profileName: params.profileName,
-      status: 'unused' as VoucherStatus,
-      comment: params.comment,
-      routerosId: routerosIds[code],
+      status:      'unused' as VoucherStatus,
+      comment:     params.comment,
+      routerosId:  routerosIds[code],
     }));
 
     await this.db.insert(vouchers).values(voucherRecords);
-
-    // Mark batch as pushed
     await this.db
       .update(voucherBatches)
       .set({ pushedToDevice: true, pushedAt: new Date() })
       .where(eq(voucherBatches.id, batch.id));
 
-    this.logger.log(
-      `✓ Generated and pushed ${params.count} vouchers to device ${params.deviceId}`,
-    );
-
+    this.logger.log(`✓ Generated and pushed ${params.count} vouchers to device ${params.deviceId}`);
     return { batchId: batch.id, vouchers: codes };
   }
 
-  /**
-   * Syncs voucher usage status from RouterOS back to PostgreSQL.
-   * This is the ONLY source of truth for voucher state.
-   */
   async syncVoucherStatus(deviceId: string, companyId: string): Promise<void> {
-    const api = await this.getConnection(deviceId);
-
-    // Get all active (currently connected) users
+    const api         = await this.getConnection(deviceId);
     const activeUsers = await api.write('/ip/hotspot/active/print');
     const activeUserMap = new Map<string, any>();
     (activeUsers as any[]).forEach((u) => activeUserMap.set(u['user'], u));
 
-    // Get all users in RouterOS hotspot
-    const allUsers = await api.write('/ip/hotspot/user/print');
-
-    // Get DB vouchers for this device
+    const allUsers  = await api.write('/ip/hotspot/user/print');
     const dbVouchers = await this.db
       .select()
       .from(vouchers)
@@ -281,69 +243,51 @@ export class MikroTikService {
 
     const voucherMap = new Map(dbVouchers.map((v) => [v.code, v]));
 
-    // Update statuses
     for (const rosUser of allUsers as any[]) {
-      const code = rosUser['name'];
+      const code      = rosUser['name'];
       const dbVoucher = voucherMap.get(code);
       if (!dbVoucher) continue;
 
-      const isActive = activeUserMap.has(code);
-      const bytesIn = parseInt(rosUser['bytes-in'] || '0');
-      const bytesOut = parseInt(rosUser['bytes-out'] || '0');
-      const uptime = rosUser['uptime'] || '0s';
-      const disabled = rosUser['disabled'] === 'true';
+      const isActive  = activeUserMap.has(code);
+      const bytesIn   = parseInt(rosUser['bytes-in']  || '0');
+      const bytesOut  = parseInt(rosUser['bytes-out'] || '0');
+      const uptime    = rosUser['uptime'] || '0s';
+      const disabled  = rosUser['disabled'] === 'true';
 
       let status: VoucherStatus = dbVoucher.status as VoucherStatus;
 
       if (disabled) {
         status = VoucherStatus.DISABLED;
+        await this.db.update(vouchers).set({ status, updatedAt: new Date() }).where(eq(vouchers.id, dbVoucher.id));
       } else if (isActive) {
         const activeUser = activeUserMap.get(code);
         status = VoucherStatus.ACTIVE;
-        await this.db
-          .update(vouchers)
-          .set({
-            status,
-            usedBy: activeUser['address'],
-            usedByMac: activeUser['mac-address'],
-            usedByIp: activeUser['address'],
-            usedAt: dbVoucher.usedAt || new Date(),
-            bytesIn,
-            bytesOut,
-            uptime,
-            updatedAt: new Date(),
-          })
-          .where(eq(vouchers.id, dbVoucher.id));
+        await this.db.update(vouchers).set({
+          status,
+          usedBy:    activeUser['address'],
+          usedByMac: activeUser['mac-address'],
+          usedByIp:  activeUser['address'],
+          usedAt:    dbVoucher.usedAt || new Date(),
+          bytesIn, bytesOut, uptime,
+          updatedAt: new Date(),
+        }).where(eq(vouchers.id, dbVoucher.id));
       } else if (bytesIn > 0 || bytesOut > 0) {
-        // Has been used but not currently active
         status = VoucherStatus.EXPIRED;
-        await this.db
-          .update(vouchers)
-          .set({ status, bytesIn, bytesOut, uptime, updatedAt: new Date() })
-          .where(eq(vouchers.id, dbVoucher.id));
+        await this.db.update(vouchers).set({ status, bytesIn, bytesOut, uptime, updatedAt: new Date() }).where(eq(vouchers.id, dbVoucher.id));
       }
     }
 
-    await this.db
-      .update(devices)
-      .set({ lastSyncAt: new Date() })
-      .where(eq(devices.id, deviceId));
-
+    await this.db.update(devices).set({ lastSyncAt: new Date() }).where(eq(devices.id, deviceId));
     this.logger.log(`✓ Voucher sync complete for device ${deviceId}`);
   }
 
   async getActiveHotspotUsers(deviceId: string): Promise<HotspotActiveUser[]> {
-    const api = await this.getConnection(deviceId);
+    const api    = await this.getConnection(deviceId);
     const active = await api.write('/ip/hotspot/active/print');
-
     return (active as any[]).map((u) => ({
-      id: u['.id'],
-      user: u['user'],
-      address: u['address'],
-      macAddress: u['mac-address'],
-      uptime: u['uptime'],
-      bytesIn: parseInt(u['bytes-in'] || '0'),
-      bytesOut: parseInt(u['bytes-out'] || '0'),
+      id: u['.id'], user: u['user'], address: u['address'],
+      macAddress: u['mac-address'], uptime: u['uptime'],
+      bytesIn: parseInt(u['bytes-in'] || '0'), bytesOut: parseInt(u['bytes-out'] || '0'),
       server: u['server'],
     }));
   }
@@ -353,18 +297,13 @@ export class MikroTikService {
     await api.write('/ip/hotspot/active/remove', [`=.id=${activeId}`]);
   }
 
-  // ── FTP Template Upload ───────────────────────────────────
+  // ── FTP Template Upload (basic-ftp — modern, Promise-based) ──
 
-  /**
-   * Accepts a ZIP file path, extracts HTML/CSS hotspot template,
-   * uploads it to MikroTik flash memory via FTP, then activates it.
-   */
   async uploadHotspotTemplate(
-    deviceId: string,
-    zipFilePath: string,
+    deviceId:     string,
+    zipFilePath:  string,
     templateName: string,
   ): Promise<void> {
-    // Load device for FTP credentials
     const [device] = await this.db
       .select()
       .from(devices)
@@ -382,14 +321,13 @@ export class MikroTikService {
 
     const host = device.useVpn && device.vpnIp ? device.vpnIp : device.host;
 
-    // Extract ZIP to temp directory
+    // Extract ZIP
     const tmpDir = path.join(os.tmpdir(), `sira-template-${Date.now()}`);
     fs.mkdirSync(tmpDir, { recursive: true });
 
     const zip = new AdmZip(zipFilePath);
     zip.extractAllTo(tmpDir, true);
 
-    // Validate it's a valid hotspot template (must have login.html)
     const loginHtml = path.join(tmpDir, 'login.html');
     if (!fs.existsSync(loginHtml)) {
       fs.rmSync(tmpDir, { recursive: true });
@@ -398,52 +336,40 @@ export class MikroTikService {
       );
     }
 
-    // Upload via FTP
-    await new Promise<void>((resolve, reject) => {
-      const ftp = new FTP();
+    // Upload via basic-ftp (Promise-based, no callbacks)
+    const client = new ftp.Client(30000);
+    client.ftp.verbose = false;
 
-      ftp.on('ready', async () => {
-        const remotePath = `/hotspot/${templateName}`;
-
-        // Create remote directory
-        await new Promise<void>((res, rej) =>
-          ftp.mkdir(remotePath, true, (err) => (err ? rej(err) : res())),
-        );
-
-        // Upload all files
-        const files = this.getAllFilesRecursive(tmpDir);
-        for (const file of files) {
-          const relativePath = path.relative(tmpDir, file).replace(/\\/g, '/');
-          const remoteFile = `${remotePath}/${relativePath}`;
-          const remoteDir = path.dirname(remoteFile).replace(/\\/g, '/');
-
-          await new Promise<void>((res, rej) =>
-            ftp.mkdir(remoteDir, true, (err) => (err ? rej(err) : res())),
-          );
-
-          await new Promise<void>((res, rej) =>
-            ftp.put(file, remoteFile, (err) => (err ? rej(err) : res())),
-          );
-        }
-
-        ftp.end();
-        resolve();
-      });
-
-      ftp.on('error', reject);
-
-      ftp.connect({
+    try {
+      await client.access({
         host,
-        port: 21,
-        user: creds.username,
+        port:     21,
+        user:     creds.username,
         password: creds.password,
+        secure:   false,
       });
-    });
 
-    // Set active hotspot profile via API
-    const api = await this.getConnection(deviceId);
+      const remotePath = `/hotspot/${templateName}`;
+      await client.ensureDir(remotePath);
 
-    // Find the first hotspot server and update its HTML directory
+      const files = this.getAllFilesRecursive(tmpDir);
+      for (const file of files) {
+        const relativePath = path.relative(tmpDir, file).replace(/\\/g, '/');
+        const remoteFile   = `${remotePath}/${relativePath}`;
+        const remoteDir    = path.posix.dirname(remoteFile);
+
+        await client.ensureDir(remoteDir);
+        await client.uploadFrom(file, remoteFile);
+      }
+
+      this.logger.log(`✓ Uploaded ${files.length} files to MikroTik flash`);
+    } finally {
+      client.close();
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+
+    // Activate template via RouterOS API
+    const api     = await this.getConnection(deviceId);
     const servers = await api.write('/ip/hotspot/print');
     if (servers.length > 0) {
       const serverId = (servers[0] as any)['.id'];
@@ -453,36 +379,27 @@ export class MikroTikService {
       ]);
     }
 
-    // Cleanup temp files
-    fs.rmSync(tmpDir, { recursive: true });
-
-    this.logger.log(`✓ Template "${templateName}" uploaded and activated on device ${deviceId}`);
+    this.logger.log(`✓ Template "${templateName}" activated on device ${deviceId}`);
   }
 
   // ── CPE / Access Point Control ────────────────────────────
 
-  /**
-   * Routes commands through MikroTik to a downstream CPE device.
-   * The CPE must be accessible via the MikroTik's local network.
-   */
   async sendCpeCommand(
     mikrotikDeviceId: string,
-    cpeIp: string,
-    command: 'set_ssid' | 'set_password' | 'reboot' | 'get_clients' | 'get_signal',
-    params?: Record<string, string>,
+    cpeIp:            string,
+    command:          'set_ssid' | 'set_password' | 'reboot' | 'get_clients' | 'get_signal',
+    params?:          Record<string, string>,
   ): Promise<any> {
     const api = await this.getConnection(mikrotikDeviceId);
 
     switch (command) {
       case 'set_ssid': {
-        // Works for MikroTik CPE (CAPsMAN or simple AP)
         const result = await api.write('/interface/wireless/set', [
           `=ssid=${params?.ssid}`,
-          `=comment=managed_by_sira`,
+          '=comment=managed_by_sira',
         ]);
         return { success: true, result };
       }
-
       case 'set_password': {
         const secProfiles = await api.write('/interface/wireless/security-profiles/print');
         if (secProfiles.length > 0) {
@@ -494,65 +411,43 @@ export class MikroTikService {
         }
         return { success: true };
       }
-
-      case 'reboot': {
-        // Schedule reboot via the tunnel
+      case 'reboot':
         await api.write('/system/reboot');
         return { success: true, message: 'إعادة التشغيل قيد التنفيذ' };
-      }
-
-      case 'get_clients': {
-        const clients = await api.write('/interface/wireless/registration-table/print');
-        return clients;
-      }
-
-      case 'get_signal': {
-        const signal = await api.write('/interface/wireless/registration-table/print', [
+      case 'get_clients':
+        return api.write('/interface/wireless/registration-table/print');
+      case 'get_signal':
+        return api.write('/interface/wireless/registration-table/print', [
           '=.proplist=signal-strength,tx-rate,rx-rate,mac-address',
         ]);
-        return signal;
-      }
-
       default:
         throw new BadRequestException(`أمر غير معروف: ${command}`);
     }
   }
 
-  // ── Terminal (Raw API Shell) ──────────────────────────────
+  // ── Terminal ──────────────────────────────────────────────
 
-  /**
-   * Executes a raw RouterOS command and returns the output.
-   * Used by the WebBox terminal feature.
-   */
   async executeTerminalCommand(
     deviceId: string,
-    command: string,
+    command:  string,
   ): Promise<{ output: string; error?: string }> {
     const api = await this.getConnection(deviceId);
 
-    // Security: block dangerous commands in non-super-admin sessions
-    const BLOCKED_COMMANDS = [
-      '/system/reset-configuration',
-      '/system/format-storage',
-      '/certificate/remove',
-    ];
-
-    const normalizedCmd = command.trim().toLowerCase().replace(/\s+/g, '/');
-    for (const blocked of BLOCKED_COMMANDS) {
-      if (normalizedCmd.includes(blocked.toLowerCase())) {
+    const BLOCKED = ['/system/reset-configuration', '/system/format-storage'];
+    const norm    = command.trim().toLowerCase().replace(/\s+/g, '/');
+    for (const blocked of BLOCKED) {
+      if (norm.includes(blocked)) {
         return { output: '', error: '⛔ هذا الأمر محظور لأسباب أمنية' };
       }
     }
 
     try {
-      // Parse RouterOS command format: /path/to/command =param=value
-      const parts = command.trim().split(' ');
-      const cmdPath = parts[0];
+      const parts    = command.trim().split(' ');
+      const cmdPath  = parts[0];
       const cmdParams = parts.slice(1).filter((p) => p.startsWith('=') || p.startsWith('?'));
-
-      const result = await api.write(cmdPath, cmdParams);
+      const result   = await api.write(cmdPath, cmdParams);
       return { output: JSON.stringify(result, null, 2) };
-    } catch (err) {
+    } catch (err: any) {
       return { output: '', error: err.message };
     }
   }
@@ -561,13 +456,12 @@ export class MikroTikService {
 
   private getAllFilesRecursive(dir: string): string[] {
     const files: string[] = [];
-    const items = fs.readdirSync(dir);
-    for (const item of items) {
-      const fullPath = path.join(dir, item);
-      if (fs.statSync(fullPath).isDirectory()) {
-        files.push(...this.getAllFilesRecursive(fullPath));
+    for (const item of fs.readdirSync(dir)) {
+      const full = path.join(dir, item);
+      if (fs.statSync(full).isDirectory()) {
+        files.push(...this.getAllFilesRecursive(full));
       } else {
-        files.push(fullPath);
+        files.push(full);
       }
     }
     return files;

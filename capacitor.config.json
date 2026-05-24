@@ -1,0 +1,39 @@
+{
+  "appId": "io.seera.platform.v4",
+  "appName": "Seera Platform",
+  "webDir": "apps/web/dist",
+  "server": {
+    "allowNavigation": [
+      "localhost",
+      "10.0.2.2",
+      "192.168.*.*",
+      "*.seera.local"
+    ],
+    "androidScheme": "https",
+    "hostname": "seera.app",
+    "errorPathHandling": "auto"
+  },
+  "android": {
+    "minWebViewVersion": 60,
+    "allowMixedContent": true,
+    "resizeOnKeyboardShow": true,
+    "backgroundColor": "#0f172a"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "launchAutoHide": true,
+      "backgroundColor": "#0f172a",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "splashFullScreen": true,
+      "splashImmersive": true
+    },
+    "StatusBar": {
+      "style": "Dark",
+      "backgroundColor": "#0f172a",
+      "overlaysWebView": false
+    }
+  }
+}

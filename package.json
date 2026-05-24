@@ -1,23 +1,56 @@
 {
-  "name": "sira-platform",
+  "name": "seera-platform",
   "version": "4.0.0",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "description": "Seera Platform v4 - Smart Integrated Business Solutions",
   "scripts": {
+    "build": "npm run build:web",
+    "build:web": "cd apps/web && npm install && npm run build",
+    "build:api": "cd apps/api && npm install && npm run build",
+    "build:all": "npm run build:web && npm run build:api",
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
-    "dev:api": "npm run dev --workspace=apps/api",
-    "dev:web": "npm run dev --workspace=apps/web",
-    "build": "npm run build --workspaces",
-    "db:generate": "npm run db:generate --workspace=apps/api",
-    "db:migrate": "npm run db:migrate --workspace=apps/api",
+    "dev:api": "cd apps/api && npm run dev",
+    "dev:web": "cd apps/web && npm run dev",
+    "cap:sync": "npx cap sync android",
+    "cap:build": "npm run build:web && npx cap sync android",
+    "db:generate": "cd apps/api && npm run db:generate",
+    "db:migrate": "cd apps/api && npm run db:migrate",
     "docker:up": "docker compose -f infra/docker-compose.yml up -d",
     "docker:down": "docker compose -f infra/docker-compose.yml down"
   },
+  "dependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/app": "^6.0.0",
+    "@capacitor/core": "^6.1.2",
+    "@capacitor/network": "^6.0.0",
+    "@capacitor/splash-screen": "^6.0.0",
+    "@capacitor/status-bar": "^6.0.0",
+    "@tanstack/react-query": "^5.18.1",
+    "axios": "^1.6.5",
+    "hls.js": "^1.5.5",
+    "lucide-react": "^0.316.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-hot-toast": "^2.4.1",
+    "react-router-dom": "^6.22.0",
+    "recharts": "^2.12.0",
+    "socket.io-client": "^4.7.4",
+    "zustand": "^4.5.0"
+  },
   "devDependencies": {
+    "@capacitor/cli": "^6.1.2",
+    "@types/react": "^18.2.55",
+    "@types/react-dom": "^18.2.19",
+    "@vitejs/plugin-legacy": "^5.3.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.17",
     "concurrently": "^8.2.2",
-    "typescript": "^5.3.3"
+    "core-js": "^3.36.0",
+    "postcss": "^8.4.35",
+    "regenerator-runtime": "^0.14.1",
+    "tailwindcss": "^3.4.1",
+    "terser": "^5.27.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.1.0"
   }
 }
