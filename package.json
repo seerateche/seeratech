@@ -5,7 +5,7 @@
   "description": "Seera Platform v4 - Smart Integrated Business Solutions",
   "scripts": {
     "build": "npm run build:web",
-    "build:web": "cd apps/web "build:web": "cd apps/web && npm install && npm run build""build:web": "cd apps/web && npm install && npm run build" npm run build",
+    "build:web": "cd apps/web && npm run build",
     "build:api": "cd apps/api && npm install && npm run build",
     "build:all": "npm run build:web && npm run build:api",
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
