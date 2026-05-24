@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "npm run build:web && node scripts/cap-setup.mjs",
-    "build:web": "cd apps/web && npm install --legacy-peer-deps && npx vite build",
+    "build:web": "cd apps/web && npx vite build",
     "dev": "cd apps/web && npm run dev",
     "cap:sync": "npx cap sync android",
     "cap:add": "npx cap add android"
