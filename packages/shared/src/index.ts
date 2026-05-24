@@ -327,6 +327,10 @@ export interface IspAccount {
   lastSyncedAt:  string | null;
   createdAt:     string;
 }
+
+// ── Access Point Command ──────────────────────────────────────
+
+export interface AccessPointCommand {
   deviceId: string;
   command: 'set_ssid' | 'set_password' | 'reboot' | 'get_clients' | 'get_signal';
   params?: Record<string, string>;

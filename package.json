@@ -1,5 +1,5 @@
 {
-  "name": "sira-platform",
+  "name": "seera-platform",
   "version": "4.0.0",
   "private": true,
   "workspaces": [
@@ -10,7 +10,8 @@
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
     "dev:api": "npm run dev --workspace=apps/api",
     "dev:web": "npm run dev --workspace=apps/web",
-    "build": "npm run build --workspaces",
+    "build": "node scripts/build-android.mjs",
+    "build:api": "npm run build --workspace=@sira/api",
     "db:generate": "npm run db:generate --workspace=apps/api",
     "db:migrate": "npm run db:migrate --workspace=apps/api",
     "docker:up": "docker compose -f infra/docker-compose.yml up -d",

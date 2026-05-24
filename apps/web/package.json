@@ -24,13 +24,13 @@
     "react-hot-toast": "^2.4.1",
     "hls.js": "^1.5.5",
     "lucide-react": "^0.316.0",
-    "@sira/shared": "*",
-    "@capacitor/core": "^6.1.2",
-    "@capacitor/android": "^6.1.2",
-    "@capacitor/status-bar": "^6.0.0",
-    "@capacitor/splash-screen": "^6.0.0",
-    "@capacitor/network": "^6.0.0",
-    "@capacitor/app": "^6.1.0"
+    "@sira/shared": "file:../../packages/shared",
+    "@capacitor/core": "^8.3.4",
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/status-bar": "^8.0.2",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/network": "^8.0.1",
+    "@capacitor/app": "^8.1.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.55",
@@ -43,6 +43,6 @@
     "postcss": "^8.4.35",
     "typescript": "^5.3.3",
     "terser": "^5.27.0",
-    "@capacitor/cli": "^6.1.2"
+    "@capacitor/cli": "^8.3.4"
   }
 }
