@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Seera Platform</string>
+    <string name="title_activity_main">Seera Platform</string>
+    <string name="package_name">io.seera.platform.v4</string>
+    <string name="custom_url_scheme">io.seera.platform.v4</string>
+</resources>

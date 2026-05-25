@@ -4,6 +4,13 @@ build/
 .env
 .env.*
 *.log
-apps/web/android/
+# android/ is intentionally tracked — it contains Gradle config for Appflow CI
+# apps/web/android/
 apps/web/ios/
 .DS_Store
+# Gradle build output (not the android project itself)
+apps/web/android/app/build/
+apps/web/android/build/
+apps/web/android/.gradle/
+apps/web/android/local.properties
+apps/web/android/capacitor-cordova-android-plugins/build/
