@@ -9,7 +9,8 @@
     "build:web": "cd apps/web && npx vite build",
     "dev": "cd apps/web && npm run dev",
     "cap:sync": "npx cap sync android",
-    "cap:add": "npx cap add android"
+    "cap:add": "npx cap add android",
+    "postinstall": "npx cap add android || true"
   },
   "dependencies": {
     "@capacitor/android": "5.7.6",
