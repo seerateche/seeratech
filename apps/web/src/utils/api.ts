@@ -1,13 +1,33 @@
 // ============================================================
-// SIRA PLATFORM v4 - Axios API Client with JWT Auto-Refresh
+// SEERA PLATFORM v4 - Axios API Client
+// Auto-detects native Capacitor context vs browser
 // ============================================================
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import toast from 'react-hot-toast';
 
+// ── API Base URL Detection ────────────────────────────────────
+function getBaseUrl(): string {
+  const cap = (window as any).Capacitor;
+  const isNative = cap?.isNativePlatform?.() === true;
+
+  if (isNative) {
+    // في التطبيق الأصلي — استخدم عنوان السيرفر الفعلي
+    // عدّل هذا الرابط ليشير لـ API server الخاص بك
+    const serverUrl = (import.meta as any).env?.VITE_API_URL
+      || 'https://YOUR-API-SERVER.com';
+    return `${serverUrl}/api/v1`;
+  }
+
+  // في المتصفح — استخدم proxy (يعمل مع vite dev server)
+  return '/api/v1';
+}
+
+const BASE_URL = getBaseUrl();
+
 let isRefreshing = false;
 let failedQueue: Array<{
   resolve: (token: string) => void;
-  reject: (err: any) => void;
+  reject:  (err: any)    => void;
 }> = [];
 
 const processQueue = (error: any, token: string | null = null) => {
@@ -19,83 +39,76 @@ const processQueue = (error: any, token: string | null = null) => {
 };
 
 export const api = axios.create({
-  baseURL: '/api/v1',
-  timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: BASE_URL,
+  timeout: 30_000,
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// Request interceptor: attach JWT
+// ── Request: attach JWT ───────────────────────────────────────
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const raw = localStorage.getItem('sira-auth');
-  if (raw) {
-    try {
+  try {
+    const raw = localStorage.getItem('sira-auth');
+    if (raw) {
       const state = JSON.parse(raw);
       const token = state?.state?.accessToken;
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    } catch {}
-  }
+      if (token) config.headers.Authorization = `Bearer ${token}`;
+    }
+  } catch {}
   return config;
 });
 
-// Response interceptor: auto-refresh on 401
+// ── Response: auto-refresh JWT ────────────────────────────────
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & {
-      _retry?: boolean;
-    };
+    const orig = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && !orig._retry) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({
             resolve: (token) => {
-              originalRequest.headers.Authorization = `Bearer ${token}`;
-              resolve(api(originalRequest));
+              orig.headers.Authorization = `Bearer ${token}`;
+              resolve(api(orig));
             },
             reject,
           });
         });
       }
 
-      originalRequest._retry = true;
+      orig._retry  = true;
       isRefreshing = true;
 
       try {
-        const raw = localStorage.getItem('sira-auth');
+        const raw   = localStorage.getItem('sira-auth');
         const state = raw ? JSON.parse(raw) : null;
-        const refreshToken = state?.state?.refreshToken;
+        const rt    = state?.state?.refreshToken;
+        if (!rt) throw new Error('No refresh token');
 
-        if (!refreshToken) throw new Error('No refresh token');
-
-        const { data } = await axios.post('/api/v1/auth/refresh', { refreshToken });
+        const { data } = await axios.post(`${BASE_URL}/auth/refresh`, {
+          refreshToken: rt,
+        });
         const newToken = data.data.accessToken;
 
-        // Update store
         if (raw) {
-          const parsed = JSON.parse(raw);
-          parsed.state.accessToken = newToken;
-          localStorage.setItem('sira-auth', JSON.stringify(parsed));
+          const p = JSON.parse(raw);
+          p.state.accessToken = newToken;
+          localStorage.setItem('sira-auth', JSON.stringify(p));
         }
 
-        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        orig.headers.Authorization = `Bearer ${newToken}`;
         processQueue(null, newToken);
-        return api(originalRequest);
-      } catch (refreshError) {
-        processQueue(refreshError, null);
+        return api(orig);
+      } catch (refreshErr) {
+        processQueue(refreshErr, null);
         localStorage.removeItem('sira-auth');
-        window.location.href = '/login';
-        return Promise.reject(refreshError);
+        window.location.hash = '#/login';
+        return Promise.reject(refreshErr);
       } finally {
         isRefreshing = false;
       }
     }
 
-    // Show error toast for common errors
     const message =
       (error.response?.data as any)?.message ||
       error.message ||
@@ -109,17 +122,17 @@ api.interceptors.response.use(
   },
 );
 
-// Typed request helpers
-export const apiGet = <T>(url: string, params?: any) =>
+// ── Typed helpers ─────────────────────────────────────────────
+export const apiGet    = <T>(url: string, params?: any) =>
   api.get<{ success: boolean; data: T }>(url, { params }).then((r) => r.data.data);
 
-export const apiPost = <T>(url: string, body?: any) =>
+export const apiPost   = <T>(url: string, body?: any) =>
   api.post<{ success: boolean; data: T }>(url, body).then((r) => r.data.data);
 
-export const apiPut = <T>(url: string, body?: any) =>
+export const apiPut    = <T>(url: string, body?: any) =>
   api.put<{ success: boolean; data: T }>(url, body).then((r) => r.data.data);
 
-export const apiPatch = <T>(url: string, body?: any) =>
+export const apiPatch  = <T>(url: string, body?: any) =>
   api.patch<{ success: boolean; data: T }>(url, body).then((r) => r.data.data);
 
 export const apiDelete = <T>(url: string) =>

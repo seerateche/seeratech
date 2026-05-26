@@ -1,10 +1,12 @@
 // ============================================================
-// SEERA PLATFORM v4 - React Entry Point + Capacitor 5 Init
+// SEERA PLATFORM v4 - Main Entry Point
+// FIX: createHashRouter instead of createBrowserRouter
+// FIX: API URL configuration for native Capacitor context
 // ============================================================
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import {
-  createBrowserRouter,
+  createHashRouter,   // ← الإصلاح الأساسي: Hash routing لـ Capacitor
   RouterProvider,
   Navigate,
   Outlet,
@@ -27,46 +29,29 @@ import { IspQuotaView }     from './pages/isp/IspQuotaView';
 import { AuthGuard }        from './components/auth/AuthGuard';
 import { UserRole }         from '@sira/shared';
 
-// ── Capacitor 5 Runtime Init ──────────────────────────────────
+// ── Capacitor 5 Init ──────────────────────────────────────────
 async function initCapacitor(): Promise<void> {
-  const isNative = !!(window as any).Capacitor?.isNativePlatform?.();
+  const cap = (window as any).Capacitor;
+  const isNative = cap?.isNativePlatform?.() === true;
   if (!isNative) return;
 
   try {
-    // StatusBar (Capacitor 5)
     const { StatusBar, Style } = await import('@capacitor/status-bar');
     await StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
     await StatusBar.setBackgroundColor({ color: '#0f172a' }).catch(() => {});
 
-    // SplashScreen
     const { SplashScreen } = await import('@capacitor/splash-screen');
-    await SplashScreen.hide({ fadeOutDuration: 400 }).catch(() => {});
+    await SplashScreen.hide({ fadeOutDuration: 300 }).catch(() => {});
 
-    // Hardware back button
     const { App } = await import('@capacitor/app');
     await App.addListener('backButton', ({ canGoBack }: { canGoBack: boolean }) => {
-      if (canGoBack) {
-        window.history.back();
-      } else {
-        App.exitApp();
-      }
+      if (canGoBack) window.history.back();
+      else App.exitApp();
     });
 
-    // Network monitor
-    const { Network } = await import('@capacitor/network');
-    await Network.addListener('networkStatusChange', (status: { connected: boolean }) => {
-      import('react-hot-toast').then(({ default: toast }) => {
-        if (!status.connected) {
-          toast.error('لا يوجد اتصال بالإنترنت', { id: 'offline', duration: Infinity });
-        } else {
-          toast.dismiss('offline');
-        }
-      });
-    });
-
-    console.log('✓ Capacitor 5 initialized');
-  } catch (err) {
-    console.debug('Capacitor init skipped:', err);
+    console.log('✓ Capacitor initialized');
+  } catch (e) {
+    // browser context — ignore
   }
 }
 
@@ -74,19 +59,21 @@ async function initCapacitor(): Promise<void> {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30_000,
-      retry: 2,
+      staleTime:            30_000,
+      retry:                1,
       refetchOnWindowFocus: false,
-      networkMode: 'offlineFirst',
+      networkMode:          'always', // لا نريد offlineFirst في native
     },
     mutations: {
-      networkMode: 'offlineFirst',
+      networkMode: 'always',
     },
   },
 });
 
-// ── Router ────────────────────────────────────────────────────
-const router = createBrowserRouter([
+// ── Hash Router (Capacitor-safe) ──────────────────────────────
+// createHashRouter يستخدم /#/path بدلاً من /path
+// يعمل بدون server-side routing — ضروري لـ Capacitor WebView
+const router = createHashRouter([
   { path: '/login', element: <LoginPage /> },
   {
     path: '/',
@@ -96,7 +83,7 @@ const router = createBrowserRouter([
       </AuthGuard>
     ),
     children: [
-      { index: true, element: <Navigate to="/dashboard" replace /> },
+      { index: true,  element: <Navigate to="/dashboard" replace /> },
       {
         path: 'god-mode',
         element: (
@@ -114,20 +101,29 @@ const router = createBrowserRouter([
       { path: 'isp-quota',                  element: <IspQuotaView /> },
     ],
   },
-  { path: '*', element: <Navigate to="/" replace /> },
+  { path: '*', element: <Navigate to="/login" replace /> },
 ]);
 
 // ── Bootstrap ─────────────────────────────────────────────────
 async function bootstrap(): Promise<void> {
+  // Capacitor init أولاً قبل React
   await initCapacitor();
 
-  ReactDOM.createRoot(document.getElementById('root')!).render(
+  const root = document.getElementById('root');
+  if (!root) {
+    console.error('FATAL: #root element not found');
+    return;
+  }
+
+  ReactDOM.createRoot(root).render(
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
         <Toaster
           position="top-center"
-          containerStyle={{ top: 'calc(env(safe-area-inset-top, 0px) + 8px)' }}
+          containerStyle={{
+            top: 'calc(env(safe-area-inset-top, 0px) + 8px)',
+          }}
           toastOptions={{
             style: {
               background:   '#1e293b',
@@ -149,4 +145,27 @@ async function bootstrap(): Promise<void> {
   );
 }
 
-bootstrap();
+// تشغيل bootstrap مع error boundary عام
+bootstrap().catch((err) => {
+  console.error('Bootstrap failed:', err);
+  // عرض رسالة خطأ بدلاً من spinner لا نهائي
+  const root = document.getElementById('root');
+  if (root) {
+    root.innerHTML = `
+      <div style="
+        display:flex;flex-direction:column;align-items:center;
+        justify-content:center;min-height:100vh;
+        background:#0f172a;color:#ef4444;
+        font-family:sans-serif;text-align:center;padding:20px;
+      ">
+        <p style="font-size:18px;margin-bottom:8px">⚠️ فشل تحميل التطبيق</p>
+        <p style="font-size:12px;color:#64748b">${err?.message || 'Unknown error'}</p>
+        <button onclick="location.reload()" style="
+          margin-top:16px;padding:10px 24px;
+          background:#6366f1;color:white;border:none;
+          border-radius:8px;cursor:pointer;font-size:14px;
+        ">إعادة التحميل</button>
+      </div>
+    `;
+  }
+});
