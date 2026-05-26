@@ -329,5 +329,5 @@ export interface IspAccount {
 }
   deviceId: string;
   command: 'set_ssid' | 'set_password' | 'reboot' | 'get_clients' | 'get_signal';
-  params?: Record<string, string>;
+  params: Record<string, string> | undefined;
 }
