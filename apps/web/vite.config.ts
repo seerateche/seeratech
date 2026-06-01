@@ -6,21 +6,43 @@ import react from '@vitejs/plugin-react';
 import legacy from '@vitejs/plugin-legacy';
 import path from 'path';
 
+// The legacy plugin runs a full Babel + core-js pass over every output
+// chunk. It is only needed to support very old Android WebViews (< Android 8).
+// Disabled by default (resource-heavy).
+// Enable: LEGACY_BUILD=true npm run build
+const enableLegacy = process.env.LEGACY_BUILD === 'true';
+
 export default defineConfig({
   plugins: [
+    // Fast React/JSX transform via esbuild (no Babel preset-env here —
+    // that's redundant with plugin-legacy and extremely CPU/memory heavy)
     react(),
-    legacy({
-      targets: ['android >= 5', 'chrome >= 67'],
-      additionalLegacyPolyfills: ['regenerator-runtime/runtime'],
-      renderLegacyChunks: true,
-      modernPolyfills: true,
-    }),
+    ...(enableLegacy
+      ? [
+          legacy({
+            targets: ['android >= 7', 'chrome >= 67'],
+            additionalLegacyPolyfills: ['regenerator-runtime/runtime'],
+            renderLegacyChunks: true,
+            polyfills: true,
+          }),
+        ]
+      : []),
   ],
 
   resolve: {
     alias: {
       '@':            path.resolve(__dirname, 'src'),
       '@sira/shared': path.resolve(__dirname, '../../packages/shared/src'),
+    },
+  },
+
+  server: {
+    port: 5173,
+    host: true,
+    proxy: {
+      '/api':     { target: 'http://localhost:3001', changeOrigin: true },
+      '/ws':      { target: 'ws://localhost:3001',   ws: true },
+      '/streams': { target: 'http://localhost:3001', changeOrigin: true },
     },
   },
 
@@ -31,18 +53,17 @@ export default defineConfig({
     minify: 'terser',
     terserOptions: {
       compress: { drop_console: false, drop_debugger: true },
-      format: { comments: false },
+      format:   { comments: false },
     },
-    // ❌ بدون manualChunks — الـ code splitting يكسر Capacitor WebView
-    // كل الكود في bundle واحد لضمان التحميل
     rollupOptions: {
       output: {
-        // bundle كل شيء في ملف واحد
-        inlineDynamicImports: false,
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          charts: ['recharts'],
+        },
       },
     },
-    // حجم تحذير مرتفع لأننا نريد bundle واحد كبير
-    chunkSizeWarningLimit: 5000,
+    chunkSizeWarningLimit: 2000,
   },
 
   css: {

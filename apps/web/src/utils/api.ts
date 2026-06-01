@@ -1,28 +1,29 @@
 // ============================================================
 // SEERA PLATFORM v4 - Axios API Client
-// Auto-detects native Capacitor context vs browser
+// Web: relative /api/v1 (nginx proxy)
+// Native APK: absolute URL from VITE_API_BASE_URL env var
 // ============================================================
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import toast from 'react-hot-toast';
 
-// ── API Base URL Detection ────────────────────────────────────
-function getBaseUrl(): string {
-  const cap = (window as any).Capacitor;
-  const isNative = cap?.isNativePlatform?.() === true;
+// ── API Base URL resolution ───────────────────────────────────
+// Web (browser/PWA): relative path → nginx reverse-proxy handles /api → backend.
+// Native (Capacitor APK): WebView is served from virtual host (https://seera.app)
+//   which has NO backend — a relative path would NEVER reach the server.
+//   Set VITE_API_BASE_URL in apps/web/.env  →  VITE_API_BASE_URL=https://api.yourdomain.com
+const ENV_BASE = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
+const isNativeApp = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.();
 
-  if (isNative) {
-    // في التطبيق الأصلي — استخدم عنوان السيرفر الفعلي
-    // عدّل هذا الرابط ليشير لـ API server الخاص بك
-    const serverUrl = (import.meta as any).env?.VITE_API_URL
-      || 'https://YOUR-API-SERVER.com';
-    return `${serverUrl}/api/v1`;
-  }
+const API_BASE_URL = ENV_BASE
+  ? `${ENV_BASE.replace(/\/$/, '')}/api/v1`
+  : '/api/v1';
 
-  // في المتصفح — استخدم proxy (يعمل مع vite dev server)
-  return '/api/v1';
+if (isNativeApp && !ENV_BASE && typeof console !== 'undefined') {
+  console.warn(
+    '[Seera] Running as native app but VITE_API_BASE_URL is not set. ' +
+    'API calls will fail. Rebuild with VITE_API_BASE_URL=https://your-api-server.com',
+  );
 }
-
-const BASE_URL = getBaseUrl();
 
 let isRefreshing = false;
 let failedQueue: Array<{
@@ -39,7 +40,7 @@ const processQueue = (error: any, token: string | null = null) => {
 };
 
 export const api = axios.create({
-  baseURL: BASE_URL,
+  baseURL: API_BASE_URL,
   timeout: 30_000,
   headers: { 'Content-Type': 'application/json' },
 });
@@ -57,7 +58,7 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config;
 });
 
-// ── Response: auto-refresh JWT ────────────────────────────────
+// ── Response: auto-refresh JWT on 401 ────────────────────────
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
@@ -80,12 +81,13 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const raw   = localStorage.getItem('sira-auth');
+        const raw = localStorage.getItem('sira-auth');
         const state = raw ? JSON.parse(raw) : null;
-        const rt    = state?.state?.refreshToken;
+        const rt = state?.state?.refreshToken;
         if (!rt) throw new Error('No refresh token');
 
-        const { data } = await axios.post(`${BASE_URL}/auth/refresh`, {
+        // Use resolved base URL (not hardcoded /api/v1)
+        const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, {
           refreshToken: rt,
         });
         const newToken = data.data.accessToken;

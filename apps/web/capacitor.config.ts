@@ -1,78 +1,44 @@
-// ============================================================
-// SEERA PLATFORM v4 - Capacitor Configuration
-// ============================================================
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  // Unique app identifier (reverse-domain format)
-  appId: 'io.seera.platform.v4',
+  appId:   'io.seera.platform.v4',
   appName: 'Seera Platform',
+  webDir:  'dist',
 
-  // Points to Vite's build output
-  webDir: 'dist',
-
-  // ── Server ───────────────────────────────────────────────
   server: {
-    // In development: point to your live dev server so you get
-    // hot-reload on the Android device.
-    // Comment out / set allowNavigation for production APK.
-    // url: 'http://192.168.1.x:5173',
-
-    // Allow the WebView to navigate to your API domain
-    allowNavigation: [
-      'localhost',
-      '10.0.2.2',    // Android emulator localhost alias
-      '192.168.*.*', // LAN
-      '*.seera.local',
-    ],
-
-    // Android: use cleartext (HTTP) in debug builds only.
-    // Production builds should use HTTPS.
+    // 'https' scheme = secure context inside WebView (recommended)
     androidScheme: 'https',
 
-    // Override the hostname used inside the WebView
-    hostname: 'seera.app',
+    // Allow WebView to reach backend API host(s)
+    allowNavigation: [
+      'localhost',
+      '10.0.2.2',        // Android emulator → host machine
+      '192.168.*.*',     // LAN testing
+      '*.seera.local',
+      // 'api.yourdomain.com', // ← add production API domain here
+    ],
 
-    // Enable error logging overlay in debug
-    errorPathHandling: 'auto',
+    // Dev: point WebView at live dev server for hot-reload
+    // url: 'http://192.168.1.x:5173',
   },
 
-  // ── Android specific ──────────────────────────────────────
   android: {
-    // Minimum SDK 22 (Android 5.1) — covers 99%+ of devices
-    minWebViewVersion: 60,
-
-    // Allow HTTP traffic (needed for local API in dev)
-    allowMixedContent: true,
-
-    // Keyboard behavior: 'native' resizes the WebView when
-    // the soft keyboard opens, preventing input overlap
-    resizeOnKeyboardShow: true,
-
-    // Prevent white flash on launch
-    backgroundColor: '#0f172a',
-
-    // Use the default back button handler
-    captureInput: false,
+    backgroundColor:   '#0f172a',
+    allowMixedContent: true,      // allow HTTP API in debug builds
   },
 
-  // ── Plugins ───────────────────────────────────────────────
   plugins: {
     SplashScreen: {
-      launchShowDuration: 2000,
-      launchAutoHide: true,
-      backgroundColor: '#0f172a',
-      androidSplashResourceName: 'splash',
-      androidScaleType: 'CENTER_CROP',
-      showSpinner: false,
-      splashFullScreen: true,
-      splashImmersive: true,
+      launchShowDuration: 1500,
+      launchAutoHide:     true,
+      backgroundColor:    '#0f172a',
+      showSpinner:        false,
+      splashFullScreen:   true,
+      splashImmersive:    true,
     },
-
     StatusBar: {
-      style: 'Dark',
+      style:           'DARK',
       backgroundColor: '#0f172a',
-      overlaysWebView: false,
     },
   },
 };

@@ -10,7 +10,9 @@
     "cap:sync": "npx cap sync",
     "cap:open": "npx cap open android",
     "cap:run": "npx cap run android",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "build:legacy": "LEGACY_BUILD=true vite build",
+    "build:apk": "LEGACY_BUILD=true vite build"
   },
   "dependencies": {
     "react": "^18.2.0",
