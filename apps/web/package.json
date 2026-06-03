@@ -45,6 +45,9 @@
     "postcss": "^8.4.35",
     "typescript": "^5.3.3",
     "terser": "^5.27.0",
+    "@babel/preset-env": "^7.24.0",
+    "core-js": "^3.36.0",
+    "regenerator-runtime": "^0.14.1",
     "@capacitor/cli": "5.7.6"
   },
   "type": "module"

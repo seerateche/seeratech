@@ -3,11 +3,11 @@
 // ============================================================
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ResponseInterceptor } from './common/response.interceptor';
 import { DatabaseModule } from './database/database.module';
 import { SecurityModule } from './security/security.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -41,20 +41,12 @@ import { IspTrackingModule } from './modules/isp-tracking/isp-tracking.module';
       },
     ]),
 
-    // JWT
-    JwtModule.registerAsync({
-      useFactory: (config: any) => ({
-        secret: config.get('JWT_SECRET'),
-        signOptions: { expiresIn: '15m' },
-      }),
-      inject: ['ConfigService'],
-    }),
-
     // Infrastructure
     DatabaseModule,
     SecurityModule,
 
     // Feature modules
+    // (AuthModule is @Global and provides JwtModule for the whole app)
     AuthModule,
     CompaniesModule,
     DevicesModule,
@@ -69,6 +61,10 @@ import { IspTrackingModule } from './modules/isp-tracking/isp-tracking.module';
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ResponseInterceptor,
     },
   ],
 })

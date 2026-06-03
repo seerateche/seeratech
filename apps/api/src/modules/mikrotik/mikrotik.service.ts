@@ -7,7 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { Inject } from '@nestjs/common';
 import { RouterOSAPI } from 'node-routeros';
 import * as ftp from 'basic-ftp';
-import * as AdmZip from 'adm-zip';
+import AdmZip from 'adm-zip';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
