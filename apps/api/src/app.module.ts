@@ -19,6 +19,7 @@ import { ZkTecoModule } from './modules/zkteco/zkteco.module';
 import { CctvModule } from './modules/cctv/cctv.module';
 import { TerminalModule } from './modules/terminal/terminal.module';
 import { IspTrackingModule } from './modules/isp-tracking/isp-tracking.module';
+import { HealthController } from './modules/health.controller';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { IspTrackingModule } from './modules/isp-tracking/isp-tracking.module';
     TerminalModule,
     IspTrackingModule,
   ],
+  controllers: [HealthController],
   providers: [
     {
       provide: APP_GUARD,
