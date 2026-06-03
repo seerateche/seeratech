@@ -10,7 +10,9 @@
     "cap:sync": "npx cap sync",
     "cap:open": "npx cap open android",
     "cap:run": "npx cap run android",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "build:legacy": "LEGACY_BUILD=true vite build",
+    "build:apk": "LEGACY_BUILD=true vite build"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -25,12 +27,12 @@
     "hls.js": "^1.5.5",
     "lucide-react": "^0.316.0",
     "@sira/shared": "*",
-    "@capacitor/core": "^6.1.2",
-    "@capacitor/android": "^6.1.2",
-    "@capacitor/status-bar": "^6.0.0",
-    "@capacitor/splash-screen": "^6.0.0",
-    "@capacitor/network": "^6.0.0",
-    "@capacitor/app": "^6.1.0"
+    "@capacitor/core": "5.7.6",
+    "@capacitor/android": "5.7.6",
+    "@capacitor/status-bar": "5.0.7",
+    "@capacitor/splash-screen": "5.0.7",
+    "@capacitor/network": "5.0.8",
+    "@capacitor/app": "5.0.7"
   },
   "devDependencies": {
     "@types/react": "^18.2.55",
@@ -43,6 +45,10 @@
     "postcss": "^8.4.35",
     "typescript": "^5.3.3",
     "terser": "^5.27.0",
-    "@capacitor/cli": "^6.1.2"
-  }
+    "@babel/preset-env": "^7.24.0",
+    "core-js": "^3.36.0",
+    "regenerator-runtime": "^0.14.1",
+    "@capacitor/cli": "5.7.6"
+  },
+  "type": "module"
 }

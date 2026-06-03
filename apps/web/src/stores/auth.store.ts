@@ -1,5 +1,5 @@
 // ============================================================
-// SIRA PLATFORM v4 - Auth Store (Zustand)
+// SEERA PLATFORM v4 - Auth Store (Zustand)
 // ============================================================
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
@@ -7,27 +7,27 @@ import { UserProfile, UserRole } from '@sira/shared';
 import { api } from '../utils/api';
 
 interface AuthState {
-  user: UserProfile | null;
-  accessToken: string | null;
-  refreshToken: string | null;
-  isLoading: boolean;
+  user:            UserProfile | null;
+  accessToken:     string | null;
+  refreshToken:    string | null;
+  isLoading:       boolean;
   isAuthenticated: boolean;
 }
 
 interface AuthActions {
-  login: (email: string, password: string, companySlug?: string) => Promise<void>;
-  logout: () => Promise<void>;
+  login:         (email: string, password: string, companySlug?: string) => Promise<void>;
+  logout:        () => Promise<void>;
   refreshTokens: () => Promise<boolean>;
-  setTokens: (accessToken: string, refreshToken: string) => void;
+  setTokens:     (accessToken: string, refreshToken: string) => void;
 }
 
 export const useAuthStore = create<AuthState & AuthActions>()(
   persist(
     (set, get) => ({
-      user: null,
-      accessToken: null,
-      refreshToken: null,
-      isLoading: false,
+      user:            null,
+      accessToken:     null,
+      refreshToken:    null,
+      isLoading:       false,
       isAuthenticated: false,
 
       login: async (email, password, companySlug) => {
@@ -39,9 +39,9 @@ export const useAuthStore = create<AuthState & AuthActions>()(
             companySlug,
           });
           set({
-            user: data.data.user,
-            accessToken: data.data.accessToken,
-            refreshToken: data.data.refreshToken,
+            user:            data.data.user,
+            accessToken:     data.data.accessToken,
+            refreshToken:    data.data.refreshToken,
             isAuthenticated: true,
           });
         } finally {
@@ -50,16 +50,11 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       },
 
       logout: async () => {
-        const { accessToken } = get();
-        if (accessToken) {
-          try {
-            await api.post('/auth/logout');
-          } catch {}
-        }
+        try { await api.post('/auth/logout'); } catch {}
         set({
-          user: null,
-          accessToken: null,
-          refreshToken: null,
+          user:            null,
+          accessToken:     null,
+          refreshToken:    null,
           isAuthenticated: false,
         });
       },
@@ -82,23 +77,22 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       },
     }),
     {
-      name: 'sira-auth',
-      storage: createJSONStorage(() => localStorage),
+      name:       'sira-auth',
+      storage:    createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        user: state.user,
-        accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
+        user:            state.user,
+        accessToken:     state.accessToken,
+        refreshToken:    state.refreshToken,
         isAuthenticated: state.isAuthenticated,
       }),
     },
   ),
 );
 
-// Selectors
-export const useUser = () => useAuthStore((s) => s.user);
+export const useUser         = () => useAuthStore((s) => s.user);
 export const useIsSuperAdmin = () =>
   useAuthStore((s) => s.user?.role === UserRole.SUPER_ADMIN);
-export const useIsAdmin = () =>
+export const useIsAdmin      = () =>
   useAuthStore(
     (s) =>
       s.user?.role === UserRole.SUPER_ADMIN ||

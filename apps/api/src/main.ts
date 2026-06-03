@@ -5,8 +5,8 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import * as compression from 'compression';
-import * as helmet from 'helmet';
+import compression from 'compression';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -22,7 +22,7 @@ async function bootstrap() {
 
   // ── Security Middleware ──────────────────────────────────
   app.use(
-    helmet.default({
+    helmet({
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],

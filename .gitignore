@@ -1,9 +1,45 @@
+# ── Node ──────────────────────────────────────────────────────
 node_modules/
-dist/
-build/
+.npm/
+
+# ── Build outputs ─────────────────────────────────────────────
+apps/web/dist/
+apps/api/dist/
+packages/shared/dist/
+*.js.map
+
+# ── Environment ───────────────────────────────────────────────
 .env
-.env.*
-*.log
+.env.local
+.env.*.local
+!.env.example
+!**/.env.example
+
+# ── Capacitor / Android ───────────────────────────────────────
+# Android project is generated at build time by scripts/cap-setup.mjs
+# (Appflow / `npm run build`), so the generated native folders are not tracked.
+/android/
 apps/web/android/
 apps/web/ios/
+.gradle/
+
+# ── Logs ──────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+*.tsbuildinfo
+
+# ── OS ────────────────────────────────────────────────────────
 .DS_Store
+Thumbs.db
+
+# ── IDE ───────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+
+# ── Streams / uploads (runtime only) ─────────────────────────
+/tmp/sira-*
+
+# ── IMPORTANT: DO NOT ignore package-lock.json ───────────────
+# package-lock.json MUST be committed for npm ci to work
+# !package-lock.json  ← this line intentionally absent

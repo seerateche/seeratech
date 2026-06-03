@@ -2,7 +2,7 @@
 // SIRA PLATFORM v4 - PDF Voucher Generation Service
 // ============================================================
 import { Injectable, Logger } from '@nestjs/common';
-import * as PDFDocument from 'pdfkit';
+import PDFDocument from 'pdfkit';
 import * as QRCode from 'qrcode';
 import * as bwipjs from 'bwip-js';
 import { Readable } from 'stream';

@@ -1,8 +1,10 @@
+import tailwindcss  from 'tailwindcss';
+import autoprefixer from 'autoprefixer';
+
 export default {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {
-      // Target Android 5+ (Chrome 67+)
+  plugins: [
+    tailwindcss('./tailwind.config.js'),
+    autoprefixer({
       overrideBrowserslist: [
         'android >= 5',
         'chrome >= 67',
@@ -10,6 +12,6 @@ export default {
         'last 2 versions',
         'not dead',
       ],
-    },
-  },
+    }),
+  ],
 };

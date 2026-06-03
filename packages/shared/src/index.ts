@@ -327,7 +327,11 @@ export interface IspAccount {
   lastSyncedAt:  string | null;
   createdAt:     string;
 }
+
+// ── CPE / AP Remote Command ───────────────────────────────────
+
+export interface CpeCommandDto {
   deviceId: string;
   command: 'set_ssid' | 'set_password' | 'reboot' | 'get_clients' | 'get_signal';
-  params?: Record<string, string>;
+  params: Record<string, string> | undefined;
 }

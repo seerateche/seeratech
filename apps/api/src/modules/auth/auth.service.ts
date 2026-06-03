@@ -19,8 +19,8 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import * as bcrypt from 'bcryptjs';
 import { eq, and } from 'drizzle-orm';
-import { DRIZZLE_TOKEN, DrizzleDB } from '../database/database.module';
-import { users, companies } from '../database/schema';
+import { DRIZZLE_TOKEN, DrizzleDB } from '../../database/database.module';
+import { users, companies } from '../../database/schema';
 import { AuthTokenPayload, UserRole } from '@sira/shared';
 
 // ── Decorators ────────────────────────────────────────────────
