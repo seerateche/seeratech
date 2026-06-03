@@ -4,6 +4,10 @@
   "private": true,
   "description": "Seera Platform v4 - Smart Integrated Business Solutions",
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "build": "npm run build:web && node scripts/cap-setup.mjs",
     "build:web": "cd apps/web && npx vite build",
