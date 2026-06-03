@@ -5,6 +5,7 @@ node_modules/
 # ── Build outputs ─────────────────────────────────────────────
 apps/web/dist/
 apps/api/dist/
+packages/shared/dist/
 *.js.map
 
 # ── Environment ───────────────────────────────────────────────
@@ -12,15 +13,20 @@ apps/api/dist/
 .env.local
 .env.*.local
 !.env.example
+!**/.env.example
 
 # ── Capacitor / Android ───────────────────────────────────────
-# DO NOT ignore android/ — Appflow needs it committed OR will generate it
-# android/app/build/
-# .gradle/
+# Android project is generated at build time by scripts/cap-setup.mjs
+# (Appflow / `npm run build`), so the generated native folders are not tracked.
+/android/
+apps/web/android/
+apps/web/ios/
+.gradle/
 
 # ── Logs ──────────────────────────────────────────────────────
 *.log
 npm-debug.log*
+*.tsbuildinfo
 
 # ── OS ────────────────────────────────────────────────────────
 .DS_Store

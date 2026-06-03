@@ -195,15 +195,14 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       // Append to session command log
+      const [existing] = await this.db
+        .select({ log: terminalSessions.commandLog })
+        .from(terminalSessions)
+        .where(eq(terminalSessions.id, session.sessionId));
+      const updatedLog = `${existing?.log || ''}\n[${new Date().toISOString()}] ${command}`;
       await this.db
         .update(terminalSessions)
-        .set({
-          commandLog: this.db
-            .select({ log: terminalSessions.commandLog })
-            .from(terminalSessions)
-            .where(eq(terminalSessions.id, session.sessionId))
-            .then(([r]) => `${r?.log || ''}\n[${new Date().toISOString()}] ${command}`),
-        })
+        .set({ commandLog: updatedLog })
         .where(eq(terminalSessions.id, session.sessionId));
     } catch (err) {
       client.emit(WsEvent.TERMINAL_ERROR, {
