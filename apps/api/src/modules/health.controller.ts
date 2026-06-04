@@ -9,10 +9,8 @@ export class HealthController {
   @Get()
   @ApiOperation({ summary: 'Health check endpoint for Railway/Docker' })
   check() {
-    return {
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-    };
+    // Return a simple string or object. 
+    // The global prefix 'api/v1' will make this accessible at /api/v1/health
+    return "OK";
   }
 }
