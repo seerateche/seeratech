@@ -31,10 +31,13 @@ WORKDIR /app
 
 RUN apk add --no-cache ffmpeg wget curl
 
-# Copy built artifacts
+# Copy built artifacts and package files
 COPY --from=builder /app/apps/api/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/api/package.json ./package.json
+COPY --from=builder /app/apps/api/package-lock.json ./package-lock.json
+
+# Install production dependencies cleanly (non-workspace layout)
+RUN npm ci --omit=dev
 
 # Create required directories
 RUN mkdir -p /app/streams /app/uploads && chmod 755 /app/streams /app/uploads
