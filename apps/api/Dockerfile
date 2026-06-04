@@ -12,10 +12,12 @@ RUN apk add --no-cache python3 make g++ ffmpeg
 
 # Copy workspace files
 COPY package.json ./
+# Railway often doesn't have a root lockfile if it's not generated, 
+# so we'll use npm install which will create one if needed.
 COPY packages/ ./packages/
 COPY apps/api/ ./apps/api/
 
-# Install all deps
+# Install all deps using the workspace feature
 RUN npm install --workspace=apps/api --workspace=packages/shared
 
 # Build shared package first
@@ -31,13 +33,14 @@ WORKDIR /app
 
 RUN apk add --no-cache ffmpeg wget curl
 
-# Copy built artifacts and package files
+# Copy built artifacts and necessary package files
 COPY --from=builder /app/apps/api/dist ./dist
 COPY --from=builder /app/apps/api/package.json ./package.json
-COPY --from=builder /app/apps/api/package-lock.json ./package-lock.json
-
-# Install production dependencies cleanly (non-workspace layout)
-RUN npm ci --omit=dev
+# Instead of relying on a potentially missing lockfile, we'll just install production deps
+# Since we are in a flat structure now, we need to make sure shared package is handled or bundled.
+# For NestJS, usually the dist contains what's needed, but let's copy the node_modules 
+# from builder to be safe, or just install them.
+COPY --from=builder /app/node_modules ./node_modules
 
 # Create required directories
 RUN mkdir -p /app/streams /app/uploads && chmod 755 /app/streams /app/uploads
@@ -49,6 +52,7 @@ USER sira
 
 EXPOSE 3001
 
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD wget -qO- http://localhost:3001/api/v1/health || exit 1
 

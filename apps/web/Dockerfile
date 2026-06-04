@@ -4,8 +4,9 @@
 
 FROM node:20-alpine AS builder
 
-ARG VITE_API_URL=http://localhost:3001
-ENV VITE_API_URL=$VITE_API_URL
+# Use VITE_API_BASE_URL as per the code in src/utils/api.ts
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 WORKDIR /app
 
@@ -13,6 +14,7 @@ COPY package.json ./
 COPY packages/ ./packages/
 COPY apps/web/ ./apps/web/
 
+# Install dependencies and build
 RUN npm install --workspace=apps/web --workspace=packages/shared
 RUN npm run build --workspace=apps/web
 
