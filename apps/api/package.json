@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "nest start --watch",
-    "prebuild": "cd ../../packages/shared && npm install && npm run build",
+    "prebuild": "cd ../../packages/shared && npm run build",
     "build": "nest build",
     "start": "node dist/main.js",
     "db:generate": "drizzle-kit generate",

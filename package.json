@@ -10,7 +10,7 @@
     "build:api": "cd apps/api && npm install --legacy-peer-deps && npm run build",
     "dev": "cd apps/web && npm run dev",
     "cap:sync": "npx cap sync android",
-    "android:init": "npx cap add android || true"
+    "android:init": "npx cap add android && npx cap sync android"
   },
   "dependencies": {
     "@capacitor/android": "5.7.6",
