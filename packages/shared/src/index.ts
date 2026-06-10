@@ -335,3 +335,207 @@ export interface CpeCommandDto {
   command: 'set_ssid' | 'set_password' | 'reboot' | 'get_clients' | 'get_signal';
   params: Record<string, string> | undefined;
 }
+
+// ============================================================
+// MikroTik Enterprise Module - Extended Types
+// (Phase A-F) — additive only, nothing above is modified.
+// ============================================================
+
+// ── Phase A: Device Information ───────────────────────────────
+
+/** Full /system/resource + identity + routerboard snapshot. */
+export interface MikroTikSystemInfo {
+  identity: string;
+  version: string;
+  boardName: string;
+  architecture: string;
+  uptime: string;
+  cpuLoad: number;          // percentage 0-100
+  cpuCount: number;
+  cpuFrequency: number;     // MHz
+  totalMemory: number;      // bytes
+  freeMemory: number;       // bytes
+  usedMemory: number;       // bytes
+  totalHdd: number;         // bytes
+  freeHdd: number;          // bytes
+  usedHdd: number;          // bytes
+  serialNumber: string;
+  factoryFirmware?: string;
+  currentFirmware?: string;
+}
+
+/** A single interface row from /interface/print with traffic counters. */
+export interface MikroTikInterfaceDetail {
+  id: string;
+  name: string;
+  type: string;
+  running: boolean;
+  disabled: boolean;
+  comment?: string;
+  macAddress?: string;
+  mtu?: string;
+  rxByte: number;
+  txByte: number;
+  rxPacket: number;
+  txPacket: number;
+  rxError: number;
+  txError: number;
+  rxDrop: number;
+  txDrop: number;
+}
+
+/** A row from /ip/address/print. */
+export interface MikroTikIpAddress {
+  id: string;
+  address: string;
+  network: string;
+  interface: string;
+  disabled: boolean;
+  dynamic: boolean;
+  comment?: string;
+}
+
+// ── Phase B: Interface Management ─────────────────────────────
+
+export interface InterfaceActionDto {
+  deviceId: string;
+  /** RouterOS interface name (e.g. "ether1") OR internal .id */
+  interface: string;
+}
+
+export interface InterfaceCommentDto extends InterfaceActionDto {
+  comment: string;
+}
+
+// ── Phase C: PPPoE Management ─────────────────────────────────
+
+export interface PppoeUser {
+  id: string;
+  name: string;
+  profile: string;
+  service: string;
+  callerId?: string;
+  rateLimit?: string;
+  comment?: string;
+  disabled: boolean;
+}
+
+export interface PppoeActiveSession {
+  id: string;
+  name: string;
+  service: string;
+  callerId: string;
+  address: string;
+  uptime: string;
+  encoding?: string;
+  sessionId?: string;
+}
+
+export interface CreatePppoeUserDto {
+  deviceId: string;
+  name: string;
+  password: string;
+  profile?: string;
+  service?: string;       // default "any"
+  rateLimit?: string;     // e.g. "10M/2M"
+  comment?: string;
+  disabled?: boolean;
+}
+
+export interface UpdatePppoeUserDto {
+  deviceId: string;
+  password?: string;
+  profile?: string;
+  service?: string;
+  rateLimit?: string;
+  comment?: string;
+  disabled?: boolean;
+}
+
+// ── Phase D: Hotspot Profiles CRUD ────────────────────────────
+
+export interface CreateHotspotProfileDto {
+  deviceId: string;
+  name: string;
+  sessionTimeout?: string;  // e.g. "1h", "30m"
+  idleTimeout?: string;
+  rateLimit?: string;       // e.g. "5M/1M"
+  sharedUsers?: number;
+  comment?: string;
+}
+
+export interface UpdateHotspotProfileDto {
+  deviceId: string;
+  name?: string;
+  sessionTimeout?: string;
+  idleTimeout?: string;
+  rateLimit?: string;
+  sharedUsers?: number;
+  comment?: string;
+}
+
+// ── Phase E: Professional Voucher Generator ───────────────────
+
+export interface GenerateProVouchersDto {
+  deviceId: string;
+  companyId: string;
+  batchName: string;
+  profileName: string;
+  count: number;                 // 10 | 50 | 100 | 500 | any
+  prefix?: string;
+  comment?: string;
+  /** Use separate username/password instead of identical code. */
+  separateCredentials?: boolean;
+  /** Length of generated username (when separateCredentials). */
+  usernameLength?: number;
+  /** Length of generated password. */
+  passwordLength?: number;
+  /** Validity window pushed to RouterOS as limit-uptime. e.g. "1d", "30d". */
+  timeLimit?: string;
+  /** Total data cap pushed as limit-bytes-total (in MB). */
+  dataLimitMb?: number;
+  /** Optional explicit expiration date (ISO) stored in DB. */
+  expiresAt?: string;
+}
+
+export interface ProVoucherRecord {
+  code: string;
+  username: string;
+  password: string;
+  /** Data string suitable for QR-Code rendering on the printed card. */
+  qrData: string;
+  profileName: string;
+  timeLimit?: string;
+  dataLimitMb?: number;
+  expiresAt?: string;
+}
+
+export interface BulkVoucherResult {
+  batchId: string;
+  batchName: string;
+  count: number;
+  vouchers: ProVoucherRecord[];
+}
+
+// ── Phase F: Monitoring ───────────────────────────────────────
+
+export interface DeviceHealth {
+  online: boolean;
+  cpuLoad: number;          // percentage
+  memoryUsed: number;       // bytes
+  memoryTotal: number;      // bytes
+  memoryPercent: number;    // 0-100
+  uptime: string;
+  activePppoe: number;
+  activeHotspot: number;
+  checkedAt: string;        // ISO timestamp
+}
+
+export interface BandwidthSample {
+  interface: string;
+  rxBitsPerSecond: number;
+  txBitsPerSecond: number;
+  rxByte: number;
+  txByte: number;
+  timestamp: string;        // ISO timestamp
+}
