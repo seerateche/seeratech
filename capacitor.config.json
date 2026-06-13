@@ -3,8 +3,8 @@
   "appName": "Seera Platform",
   "webDir": "apps/web/dist",
   "server": {
-    "androidScheme": "https",
-    "hostname": "seera.app",
+    "androidScheme": "http",
+    "hostname": "localhost",
     "allowNavigation": [
       "localhost",
       "10.0.2.2",
@@ -15,7 +15,7 @@
   },
   "android": {
     "backgroundColor": "#0f172a",
-    "allowMixedContent": true
+
   },
   "plugins": {
     "SplashScreen": {

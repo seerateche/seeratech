@@ -1,2 +1,1 @@
-web: cd apps/web && npm run dev -- --host
-api: cd apps/api && npm run start
+api: cd apps/api && node dist/main.js
