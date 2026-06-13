@@ -180,7 +180,7 @@ export const VouchersPage: React.FC = () => {
           <div className="card-header gap-3 flex-wrap">
             {/* Status filter */}
             <div className="flex items-center gap-1">
-              {(['all', 'unused', 'active', 'expired', 'disabled'] as const).map((s) => (
+              {(['all', VoucherStatus.UNUSED, VoucherStatus.ACTIVE, VoucherStatus.EXPIRED, VoucherStatus.DISABLED] as Array<VoucherStatus | 'all'>).map((s) => (
                 <button
                   key={s}
                   onClick={() => setStatusFilter(s)}
