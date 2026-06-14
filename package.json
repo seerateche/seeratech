@@ -4,11 +4,15 @@
   "private": true,
   "description": "Seera Platform v4 - Smart Integrated Business Solutions",
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "build": "npm run build:web && node scripts/cap-setup.mjs",
     "build:web": "cd apps/web && npx vite build",
     "build:api": "cd apps/api && npm install --legacy-peer-deps && npm run build",
-    "dev": "cd apps/web && npm run dev",
+    "dev": "concurrently \"cd apps/web && npm run dev\" \"cd apps/api && npm run start:dev\"",
     "cap:sync": "npx cap sync android",
     "android:init": "npx cap add android && npx cap sync android"
   },
@@ -44,10 +48,7 @@
     "tailwindcss": "^3.4.1",
     "terser": "^5.27.0",
     "typescript": "^5.3.3",
-    "vite": "^5.1.0"
-  },
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ]
+    "vite": "^5.1.0",
+    "concurrently": "^8.2.2"
+  }
 }

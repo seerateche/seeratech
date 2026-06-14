@@ -20,7 +20,7 @@ export default defineConfig({
     ...(enableLegacy
       ? [
           legacy({
-            targets: ['android >= 7', 'chrome >= 67'],
+            targets: ["android >= 7", "chrome >= 70"],
             additionalLegacyPolyfills: ['regenerator-runtime/runtime'],
             renderLegacyChunks: true,
             polyfills: true,
@@ -58,7 +58,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
+          vendor: ['react', 'react-dom', 'react-router-dom', '@capacitor/core'],
           charts: ['recharts'],
         },
       },
