@@ -539,3 +539,72 @@ export interface BandwidthSample {
   txByte: number;
   timestamp: string;        // ISO timestamp
 }
+
+// ── Phase 4: Realtime Monitoring ──────────────────────────────
+
+/** Combined realtime snapshot broadcast on the /ws/mikrotik namespace. */
+export interface MikroTikRealtimeSnapshot {
+  deviceId: string;
+  online: boolean;
+  cpuLoad: number;          // percentage
+  memoryUsed: number;       // bytes
+  memoryTotal: number;      // bytes
+  memoryPercent: number;    // 0-100
+  uptime: string;
+  activePppoe: number;
+  activeHotspot: number;
+  rxBitsPerSecond: number;
+  txBitsPerSecond: number;
+  interface: string;
+  timestamp: string;        // ISO timestamp
+}
+
+// ── Phase 5: Backup Management ────────────────────────────────
+
+export type MikroTikBackupType = 'binary' | 'export';
+
+export interface MikroTikBackupRecord {
+  fileName: string;
+  type: MikroTikBackupType;
+  sizeBytes: number;
+  createdAt: string;        // ISO timestamp
+  downloadUrl: string;      // relative API URL to download the file
+}
+
+// ── Phase 6: Queue Management ─────────────────────────────────
+
+export interface SimpleQueue {
+  id: string;
+  name: string;
+  target: string;           // e.g. "192.168.88.10/32"
+  maxLimit?: string;        // "10M/2M"
+  burstLimit?: string;      // "20M/4M"
+  burstThreshold?: string;  // "8M/1M"
+  burstTime?: string;       // "8s/8s"
+  comment?: string;
+  disabled: boolean;
+}
+
+export interface CreateSimpleQueueDto {
+  deviceId: string;
+  name: string;
+  target: string;
+  maxLimit?: string;
+  burstLimit?: string;
+  burstThreshold?: string;
+  burstTime?: string;
+  comment?: string;
+  disabled?: boolean;
+}
+
+export interface UpdateSimpleQueueDto {
+  deviceId: string;
+  name?: string;
+  target?: string;
+  maxLimit?: string;
+  burstLimit?: string;
+  burstThreshold?: string;
+  burstTime?: string;
+  comment?: string;
+  disabled?: boolean;
+}

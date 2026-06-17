@@ -4,7 +4,7 @@
 // ============================================================
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Shield, Mail, Building2 } from 'lucide-react';
+import { Shield, Mail, Building2, Lock, Eye, EyeOff } from 'lucide-react';
 import { SecureInput } from '../../components/ui/FormInputs';
 import { useAuthStore } from '../../stores/auth.store';
 import toast from 'react-hot-toast';
@@ -117,6 +117,7 @@ export const LoginPage: React.FC = () => {
   
   const [mode, setMode] = useState<'company' | 'superadmin'>('company');
   const [ready, setReady] = useState(false);
+  const [showPass, setShowPass] = useState(false);
 
   const from = (location.state as any)?.from?.pathname || '/dashboard';
   useEffect(() => { const t = setTimeout(() => setReady(true), 100); return () => clearTimeout(t); }, []);

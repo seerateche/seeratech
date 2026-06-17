@@ -100,3 +100,36 @@ export class GenerateProVouchersBody {
   /** Optional explicit expiration date (ISO) stored in DB. */
   @IsOptional() @IsString() expiresAt?: string;
 }
+
+// ── Phase 5: Backup Management ────────────────────────────────
+
+export class CreateBackupBody {
+  @IsUUID() deviceId: string;
+  @IsOptional() @IsString() type?: 'binary' | 'export'; // default "binary"
+}
+
+// ── Phase 6: Queue Management (Simple Queues) ─────────────────
+
+export class CreateSimpleQueueBody {
+  @IsUUID() deviceId: string;
+  @IsString() @IsNotEmpty() @MaxLength(64) name: string;
+  @IsString() @IsNotEmpty() target: string; // e.g. "192.168.88.10/32"
+  @IsOptional() @IsString() maxLimit?: string; // "10M/2M"
+  @IsOptional() @IsString() burstLimit?: string; // "20M/4M"
+  @IsOptional() @IsString() burstThreshold?: string; // "8M/1M"
+  @IsOptional() @IsString() burstTime?: string; // "8s/8s"
+  @IsOptional() @IsString() @MaxLength(255) comment?: string;
+  @IsOptional() @IsBoolean() disabled?: boolean;
+}
+
+export class UpdateSimpleQueueBody {
+  @IsUUID() deviceId: string;
+  @IsOptional() @IsString() @MaxLength(64) name?: string;
+  @IsOptional() @IsString() target?: string;
+  @IsOptional() @IsString() maxLimit?: string;
+  @IsOptional() @IsString() burstLimit?: string;
+  @IsOptional() @IsString() burstThreshold?: string;
+  @IsOptional() @IsString() burstTime?: string;
+  @IsOptional() @IsString() @MaxLength(255) comment?: string;
+  @IsOptional() @IsBoolean() disabled?: boolean;
+}
