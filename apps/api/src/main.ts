@@ -80,7 +80,9 @@ async function bootstrap() {
     logger.log(`📚 Swagger docs available at: http://localhost:${port}/api/docs`);
   }
 
-  await app.listen(port);
+  // Bind to 0.0.0.0 so the service is reachable inside Docker / Railway
+  // (binding to localhost would make the container unreachable externally).
+  await app.listen(port, '0.0.0.0');
 
   logger.log(`🚀 Sira Platform API running on port ${port} [${env}]`);
   logger.log(`🔒 AES-256-GCM encryption: ACTIVE`);

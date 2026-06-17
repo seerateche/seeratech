@@ -18,17 +18,37 @@ export type DrizzleDB = ReturnType<typeof drizzle<typeof schema>>;
       provide: DRIZZLE_TOKEN,
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const pool = new Pool({
-          host: config.get<string>('DB_HOST', 'localhost'),
-          port: config.get<number>('DB_PORT', 5432),
-          database: config.get<string>('DB_NAME', 'sira_db'),
-          user: config.get<string>('DB_USER', 'sira'),
-          password: config.get<string>('DB_PASSWORD', 'sira_secret'),
-          max: 20,
-          idleTimeoutMillis: 30000,
-          connectionTimeoutMillis: 2000,
-          ssl: config.get('DB_SSL') === 'true' ? { rejectUnauthorized: false } : false,
-        });
+        // Railway (and most managed Postgres providers) expose a single
+        // DATABASE_URL connection string. Prefer it when present, otherwise
+        // fall back to the individual DB_* variables used in local/compose dev.
+        const databaseUrl = config.get<string>('DATABASE_URL');
+
+        // Enable SSL automatically for managed providers (their URLs usually
+        // require it) or when explicitly requested via DB_SSL=true.
+        const sslEnabled =
+          config.get('DB_SSL') === 'true' ||
+          (!!databaseUrl && config.get('NODE_ENV') === 'production');
+        const ssl = sslEnabled ? { rejectUnauthorized: false } : false;
+
+        const pool = databaseUrl
+          ? new Pool({
+              connectionString: databaseUrl,
+              max: 20,
+              idleTimeoutMillis: 30000,
+              connectionTimeoutMillis: 10000,
+              ssl,
+            })
+          : new Pool({
+              host: config.get<string>('DB_HOST', 'localhost'),
+              port: config.get<number>('DB_PORT', 5432),
+              database: config.get<string>('DB_NAME', 'sira_db'),
+              user: config.get<string>('DB_USER', 'sira'),
+              password: config.get<string>('DB_PASSWORD', 'sira_secret'),
+              max: 20,
+              idleTimeoutMillis: 30000,
+              connectionTimeoutMillis: 10000,
+              ssl,
+            });
 
         pool.on('error', (err) => {
           console.error('PostgreSQL pool error:', err);

@@ -12,8 +12,6 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "strict": false,
-    "strictNullChecks": true,
-    "noImplicitAny": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["./apps/web/src/*"],
@@ -23,7 +21,6 @@
   "include": [
     "apps/web/src",
     "packages/shared/src",
-    "vite.config.ts",
-    "apps/api/src"
+    "vite.config.ts"
   ]
 }

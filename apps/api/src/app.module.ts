@@ -19,7 +19,7 @@ import { ZkTecoModule } from './modules/zkteco/zkteco.module';
 import { CctvModule } from './modules/cctv/cctv.module';
 import { TerminalModule } from './modules/terminal/terminal.module';
 import { IspTrackingModule } from './modules/isp-tracking/isp-tracking.module';
-import { HealthController } from './modules/health.controller';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -46,6 +46,9 @@ import { HealthController } from './modules/health.controller';
     DatabaseModule,
     SecurityModule,
 
+    // Health check (public, used by Railway/Docker healthcheck)
+    HealthModule,
+
     // Feature modules
     // (AuthModule is @Global and provides JwtModule for the whole app)
     AuthModule,
@@ -58,7 +61,6 @@ import { HealthController } from './modules/health.controller';
     TerminalModule,
     IspTrackingModule,
   ],
-  controllers: [HealthController],
   providers: [
     {
       provide: APP_GUARD,
