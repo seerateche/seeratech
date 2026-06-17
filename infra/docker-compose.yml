@@ -104,7 +104,7 @@ services:
       CORS_ORIGINS:      ${CORS_ORIGINS:-http://localhost:5173,http://localhost:80}
       # Storage
       STORAGE_PATH:      /app/streams
-      UPLOADS_PATH:      /app/uploads
+      UPLOADS_DIR:       /app/uploads
     volumes:
       - streams_data:/app/streams
       - uploads_data:/app/uploads
