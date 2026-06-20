@@ -240,11 +240,15 @@ export class IspTrackingService {
       ) {
         // Session still valid (>1 min left)
         try {
-          const [tIv, tCipher] = account.encryptedSessionToken.split(':');
+          // Stored format is "iv:ciphertext:tag" (AES-256-GCM requires the tag).
+          const [tIv, tCipher, tTag] = account.encryptedSessionToken.split(':');
+          if (!tIv || !tCipher || !tTag) {
+            throw new Error('legacy/invalid session token format');
+          }
           token = this.security.decrypt({
             ciphertext: tCipher,
             iv:  tIv,
-            tag: '', // session token stored with empty tag (stream cipher)
+            tag: tTag,
           });
           this.logger.debug(`Using cached WE session for account ${id}`);
         } catch {
@@ -274,13 +278,15 @@ export class IspTrackingService {
           token     = authResp.token;
           accountId = authResp.accountId;
 
-          // Cache encrypted session token (valid for expiresIn seconds)
+          // Cache encrypted session token (valid for expiresIn seconds).
+          // Store as "iv:ciphertext:tag" so the GCM auth tag survives the
+          // round-trip and the cached token actually decrypts on next use.
           const tokenEnc = this.security.encrypt(token);
           const expiresAt = new Date(Date.now() + (authResp.expiresIn - 60) * 1000);
           await this.db
             .update(ispAccounts)
             .set({
-              encryptedSessionToken: `${tokenEnc.iv}:${tokenEnc.ciphertext}`,
+              encryptedSessionToken: `${tokenEnc.iv}:${tokenEnc.ciphertext}:${tokenEnc.tag}`,
               sessionTokenExpiresAt: expiresAt,
             })
             .where(eq(ispAccounts.id, id));

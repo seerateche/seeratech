@@ -34,8 +34,11 @@ export class DevicesService {
       user.role === UserRole.SUPER_ADMIN ? dto.companyId : user.companyId;
     if (!companyId) throw new NotFoundException('لم يتم تحديد الشركة');
 
-    const enc = this.security.encrypt(dto.username);
-    const encPass = this.security.encrypt(dto.password);
+    // Encrypt credentials in the composite "iv:ciphertext" format expected by
+    // SecurityService.decryptCredentials() on the device-read path. Using
+    // encrypt() twice and storing only the username's iv/tag previously broke
+    // password (and username) decryption for every device.
+    const creds = this.security.encryptCredentials(dto.username, dto.password);
 
     const [created] = await this.db
       .insert(devices)
@@ -46,10 +49,10 @@ export class DevicesService {
         host: dto.host,
         port: dto.port,
         apiPort: dto.apiPort,
-        encryptedUsername: enc.ciphertext,
-        encryptedPassword: encPass.ciphertext,
-        credentialIv: enc.iv,
-        credentialTag: enc.tag,
+        encryptedUsername: creds.encryptedUsername,
+        encryptedPassword: creds.encryptedPassword,
+        credentialIv: creds.iv,
+        credentialTag: creds.tag,
         useVpn: dto.useVpn ?? false,
         vpnIp: dto.vpnIp,
         description: dto.description,
