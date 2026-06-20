@@ -151,6 +151,15 @@ bootstrap().catch((err) => {
   // عرض رسالة خطأ بدلاً من spinner لا نهائي
   const root = document.getElementById('root');
   if (root) {
+    // Escape the error message to prevent XSS via innerHTML interpolation.
+    const escapeHtml = (s: string) =>
+      s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    const safeMessage = escapeHtml(String(err?.message || 'Unknown error'));
     root.innerHTML = `
       <div style="
         display:flex;flex-direction:column;align-items:center;
@@ -159,7 +168,7 @@ bootstrap().catch((err) => {
         font-family:sans-serif;text-align:center;padding:20px;
       ">
         <p style="font-size:18px;margin-bottom:8px">⚠️ فشل تحميل التطبيق</p>
-        <p style="font-size:12px;color:#64748b">${err?.message || 'Unknown error'}</p>
+        <p style="font-size:12px;color:#64748b">${safeMessage}</p>
         <button onclick="location.reload()" style="
           margin-top:16px;padding:10px 24px;
           background:#6366f1;color:white;border:none;

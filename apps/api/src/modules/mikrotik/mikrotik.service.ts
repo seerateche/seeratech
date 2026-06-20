@@ -225,9 +225,13 @@ export class MikroTikService {
     if (oldestId) void this.closePooled(oldestId);
   }
 
-  /** Periodically reap idle sockets so the pool never leaks (every 60s). */
+  /**
+   * Periodically reap idle sockets so the pool never leaks (every 60s).
+   * Must be public: @nestjs/schedule discovers @Interval handlers via
+   * metadata reflection over public instance methods.
+   */
   @Interval(60_000)
-  private reapIdleConnections(): void {
+  reapIdleConnections(): void {
     const now = Date.now();
     for (const [id, c] of this.connectionPool) {
       if (now - c.lastUsed > this.IDLE_TTL_MS) {
@@ -348,9 +352,14 @@ export class MikroTikService {
 
     const codes: string[] = [];
     const prefix = params.prefix || 'SIRA';
-    for (let i = 0; i < params.count; i++) {
-      const random = Math.random().toString(36).substring(2, 10).toUpperCase();
-      codes.push(`${prefix}-${random}`);
+    // Use a CSPRNG (crypto.randomBytes via randomCode) for voucher codes;
+    // Math.random() is not cryptographically secure and is predictable.
+    const seen = new Set<string>();
+    while (codes.length < params.count) {
+      const candidate = `${prefix}-${this.randomCode(8)}`;
+      if (seen.has(candidate)) continue; // avoid in-batch collisions
+      seen.add(candidate);
+      codes.push(candidate);
     }
 
     const [batch] = await this.db
@@ -389,12 +398,23 @@ export class MikroTikService {
       deviceId:    params.deviceId,
       code,
       profileName: params.profileName,
-      status:      'unused' as VoucherStatus,
+      status:      VoucherStatus.UNUSED,
       comment:     params.comment,
       routerosId:  routerosIds[code],
     }));
 
-    await this.db.insert(vouchers).values(voucherRecords);
+    try {
+      await this.db.insert(vouchers).values(voucherRecords);
+    } catch (err: any) {
+      // uniqueIndex on (deviceId, code) guards against duplicate voucher codes.
+      // Postgres unique-violation code is 23505.
+      if (err?.code === '23505') {
+        throw new BadRequestException(
+          'تعارض في أكواد الفاوتشر (تكرار). يرجى إعادة المحاولة.',
+        );
+      }
+      throw err;
+    }
     await this.db
       .update(voucherBatches)
       .set({ pushedToDevice: true, pushedAt: new Date() })
@@ -1069,7 +1089,7 @@ export class MikroTikService {
           deviceId: dto.deviceId,
           code: rec.username,
           profileName: dto.profileName,
-          status: 'unused' as VoucherStatus,
+          status: VoucherStatus.UNUSED,
           comment: dto.comment,
           routerosId: routerosIds[rec.username],
           expiresAt,
