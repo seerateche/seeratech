@@ -13,36 +13,42 @@ export class CompaniesService {
 
   /** Global list of all companies with aggregate counts (Super Admin). */
   async listCompanies() {
-    const rows = await this.db.select().from(companies);
+    // Avoid the previous N+1 pattern (2 queries per company). Use a fixed
+    // number of grouped aggregate queries (3 total) regardless of company count.
+    const [rows, deviceCounts, voucherCounts] = await Promise.all([
+      this.db.select().from(companies),
+      this.db
+        .select({
+          companyId: devices.companyId,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(devices)
+        .groupBy(devices.companyId),
+      this.db
+        .select({
+          companyId: vouchers.companyId,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(vouchers)
+        .where(eq(vouchers.status, 'active'))
+        .groupBy(vouchers.companyId),
+    ]);
 
-    const summaries = await Promise.all(
-      rows.map(async (c) => {
-        const [{ count: deviceCount }] = await this.db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(devices)
-          .where(eq(devices.companyId, c.id));
+    const deviceMap = new Map(deviceCounts.map((d) => [d.companyId, d.count]));
+    const voucherMap = new Map(voucherCounts.map((v) => [v.companyId, v.count]));
 
-        const [{ count: activeVouchers }] = await this.db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(vouchers)
-          .where(and(eq(vouchers.companyId, c.id), eq(vouchers.status, 'active')));
-
-        return {
-          id: c.id,
-          name: c.name,
-          slug: c.slug,
-          status: c.status,
-          country: c.country,
-          city: c.city,
-          deviceCount: deviceCount ?? 0,
-          activeVouchers: activeVouchers ?? 0,
-          lastSeen: null,
-          createdAt: c.createdAt?.toISOString?.() ?? null,
-        };
-      }),
-    );
-
-    return summaries;
+    return rows.map((c) => ({
+      id: c.id,
+      name: c.name,
+      slug: c.slug,
+      status: c.status,
+      country: c.country,
+      city: c.city,
+      deviceCount: deviceMap.get(c.id) ?? 0,
+      activeVouchers: voucherMap.get(c.id) ?? 0,
+      lastSeen: null,
+      createdAt: c.createdAt?.toISOString?.() ?? null,
+    }));
   }
 
   /** Global platform statistics for the God-Mode dashboard. */

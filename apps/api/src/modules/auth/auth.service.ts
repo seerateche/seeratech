@@ -31,12 +31,9 @@ export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
 export const ROLES_KEY = 'roles';
 export const Roles = (...roles: UserRole[]) => SetMetadata(ROLES_KEY, roles);
 
-export const CurrentUser = () => {
-  const decorator = (target: any, key: string, index: number) => {
-    // param decorator implementation via createParamDecorator in NestJS
-  };
-  return decorator;
-};
+// NOTE: The real @CurrentUser param decorator lives in
+// common/current-user.decorator.ts (built via createParamDecorator).
+// A non-functional duplicate previously defined here was removed.
 
 // ── JWT Strategy ──────────────────────────────────────────────
 
