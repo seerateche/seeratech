@@ -389,6 +389,7 @@ export const companyRelations = relations(companies, ({ many }) => ({
   employees: many(employees),
   terminalSessions: many(terminalSessions),
   hotspotTemplates: many(hotspotTemplates),
+  ispAccounts: many(ispAccounts),
 }));
 
 export const userRelations = relations(users, ({ one, many }) => ({
@@ -540,10 +541,6 @@ export const ispAccountRelations = relations(ispAccounts, ({ one }) => ({
 }));
 
 // Add to company relations (append via separate relations call)
-export const companyIspRelations = relations(companies, ({ many }) => ({
-  ispAccounts: many(ispAccounts),
-}));
-
 // ── Type Exports ──────────────────────────────────────────────
 
 export type IspAccount    = typeof ispAccounts.$inferSelect;

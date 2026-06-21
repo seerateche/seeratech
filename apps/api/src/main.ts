@@ -80,6 +80,11 @@ async function bootstrap() {
     logger.log(`📚 Swagger docs available at: http://localhost:${port}/api/docs`);
   }
 
+  // Enable graceful shutdown hooks so onModuleDestroy handlers run on
+  // SIGTERM/SIGINT (Railway sends SIGTERM on redeploy/scale-down). This lets
+  // pooled MikroTik sockets and other resources close cleanly.
+  app.enableShutdownHooks();
+
   // Bind to 0.0.0.0 so the service is reachable inside Docker / Railway
   // (binding to localhost would make the container unreachable externally).
   await app.listen(port, '0.0.0.0');

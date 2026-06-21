@@ -165,9 +165,14 @@ export class SecurityService {
 
   /**
    * Constant-time comparison to prevent timing attacks.
+   *
+   * Both inputs are SHA-256 hashed first so the buffers are always the same
+   * fixed length (32 bytes). This avoids leaking the secret's length via an
+   * early length-mismatch return, and lets timingSafeEqual run unconditionally.
    */
   safeCompare(a: string, b: string): boolean {
-    if (a.length !== b.length) return false;
-    return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+    const ha = crypto.createHash('sha256').update(a, 'utf8').digest();
+    const hb = crypto.createHash('sha256').update(b, 'utf8').digest();
+    return crypto.timingSafeEqual(ha, hb);
   }
 }
