@@ -12,6 +12,7 @@ import {
   MessageBody,
   ConnectedSocket,
   OnGatewayConnection,
+  OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -29,7 +30,9 @@ interface AuthedSocket extends Socket {
   cors: { origin: '*', credentials: true },
   namespace: '/ws/mikrotik',
 })
-export class MikroTikRealtimeGateway implements OnGatewayConnection {
+export class MikroTikRealtimeGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
@@ -67,6 +70,16 @@ export class MikroTikRealtimeGateway implements OnGatewayConnection {
     } catch {
       client.emit('error', { message: 'رمز التوثيق غير صالح' });
       client.disconnect();
+    }
+  }
+
+  /**
+   * Free the per-socket subscription set on disconnect. Without this the
+   * subscriptions Map grows unbounded as sockets churn (memory leak).
+   */
+  handleDisconnect(client: AuthedSocket): void {
+    if (this.subscriptions.delete(client.id)) {
+      this.logger.debug(`MikroTik realtime socket disconnected: ${client.id}`);
     }
   }
 

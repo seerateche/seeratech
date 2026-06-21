@@ -2,7 +2,7 @@
 // SIRA PLATFORM v4 - MikroTik Service (Direct API / No RADIUS)
 // node-ftp → basic-ftp (modern, Promise-based, typed)
 // ============================================================
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Inject } from '@nestjs/common';
 import { RouterOSAPI } from 'node-routeros';
@@ -56,7 +56,7 @@ interface PooledConnection {
 }
 
 @Injectable()
-export class MikroTikService {
+export class MikroTikService implements OnModuleDestroy {
   private readonly logger = new Logger(MikroTikService.name);
   private readonly connectionPool = new Map<string, PooledConnection>();
   /** In-flight connection promises — prevents a thundering-herd race
@@ -209,6 +209,15 @@ export class MikroTikService {
       try { await pooled.api.close(); } catch { /* ignore */ }
       this.connectionPool.delete(deviceId);
     }
+  }
+
+  /**
+   * Gracefully close all pooled RouterOS sockets on shutdown so the process
+   * doesn't leak open TCP connections (important for clean Railway restarts).
+   */
+  async onModuleDestroy(): Promise<void> {
+    const ids = [...this.connectionPool.keys()];
+    await Promise.all(ids.map((id) => this.closePooled(id)));
   }
 
   /** Evict the oldest connection when the pool hits its hard cap. */
