@@ -55,7 +55,9 @@ async function bootstrap() {
   );
 
   // ── API Prefix ────────────────────────────────────────────
-  app.setGlobalPrefix('api/v1');
+  // Exclude the bare root path so RootController stays at "/" (a friendly
+  // landing/info response) instead of being prefixed to "/api/v1".
+  app.setGlobalPrefix('api/v1', { exclude: ['/'] });
 
   // ── Swagger Docs (dev only) ───────────────────────────────
   if (env !== 'production') {
