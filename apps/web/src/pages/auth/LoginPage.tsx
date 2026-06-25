@@ -363,7 +363,7 @@ export const LoginPage: React.FC = () => {
             background: 'rgba(6,9,18,0.7)', borderTop: '1px solid rgba(99,102,241,0.07)',
           }}>
             <p style={{ fontSize: 10, color: '#4f46e5', fontFamily: 'monospace' }}>
-              fghdhttdsffgyhd-ops.github.io/seera-alex2026
+              © {new Date().getFullYear()} Seera Platform · v4.0
             </p>
             <p style={{ fontSize: 9, color: '#1e293b', marginTop: 3 }}>
               دعم دائم لخدمتك &nbsp;|&nbsp; Constant Technical Support &nbsp;|&nbsp; Постоянная Техническая Поддержка

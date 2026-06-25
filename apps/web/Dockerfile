@@ -22,11 +22,18 @@ RUN npm run build --workspace=apps/web
 FROM nginx:alpine
 
 COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
-COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 
+# Use a templated config so nginx listens on Railway's injected $PORT.
+# nginx:alpine auto-processes templates in /etc/nginx/templates/*.template
+# via envsubst at container start, writing the result to /etc/nginx/conf.d/.
+COPY apps/web/nginx.conf.template /etc/nginx/templates/default.conf.template
+
+# Default for local/docker runs; Railway overrides PORT at runtime.
+ENV PORT=80
 EXPOSE 80
 
+# Health check hits the lightweight /healthz endpoint on the active port.
 HEALTHCHECK --interval=30s --timeout=5s \
-  CMD wget -qO- http://localhost:80 || exit 1
+  CMD wget -qO- "http://localhost:${PORT}/healthz" || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]

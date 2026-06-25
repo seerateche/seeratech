@@ -50,11 +50,9 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     sourcemap: false,
-    minify: 'terser',
-    terserOptions: {
-      compress: { drop_console: false, drop_debugger: true },
-      format:   { comments: false },
-    },
+    // esbuild minify is far lighter on memory/CPU than terser and is enough
+    // for production. terser was OOM-killing low-memory build environments.
+    minify: 'esbuild',
     rollupOptions: {
       output: {
         manualChunks: {
