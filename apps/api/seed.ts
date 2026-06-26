@@ -11,13 +11,24 @@ import * as schema from './src/database/schema';
 async function seed() {
   console.log('🌱 Seeding Seera Platform database...');
 
-  const pool = new Pool({
-    host:     process.env.DB_HOST     || 'localhost',
-    port:     parseInt(process.env.DB_PORT || '5432'),
-    database: process.env.DB_NAME     || 'sira_db',
-    user:     process.env.DB_USER     || 'sira',
-    password: process.env.DB_PASSWORD || 'sira_secure_2025',
-  });
+  // Railway exposes a single DATABASE_URL; prefer it when present, otherwise
+  // fall back to the individual DB_* variables used in local/compose dev.
+  const databaseUrl = process.env.DATABASE_URL;
+  const sslEnabled =
+    process.env.DB_SSL === 'true' ||
+    (!!databaseUrl && process.env.NODE_ENV === 'production');
+  const ssl = sslEnabled ? { rejectUnauthorized: false } : false;
+
+  const pool = databaseUrl
+    ? new Pool({ connectionString: databaseUrl, ssl })
+    : new Pool({
+        host:     process.env.DB_HOST     || 'localhost',
+        port:     parseInt(process.env.DB_PORT || '5432'),
+        database: process.env.DB_NAME     || 'sira_db',
+        user:     process.env.DB_USER     || 'sira',
+        password: process.env.DB_PASSWORD || 'sira_secure_2025',
+        ssl,
+      });
 
   const db = drizzle(pool, { schema });
 
