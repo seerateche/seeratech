@@ -64,11 +64,7 @@ export const CompanyDashboard: React.FC = () => {
     );
   }
 
-  const usageData = data?.voucherUsageHistory || Array.from({ length: 7 }, (_, i) => ({
-    date: new Date(Date.now() - (6 - i) * 86400000).toLocaleDateString('ar', { month: 'short', day: 'numeric' }),
-    used: Math.floor(Math.random() * 50),
-    generated: Math.floor(Math.random() * 20 + 10),
-  }));
+  const usageData = data?.voucherUsageHistory || [];
 
   const pieData = [
     { status: 'متصل', count: onlineCount },

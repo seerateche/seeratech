@@ -55,12 +55,11 @@ async function bootstrap() {
   );
 
   // ── API Prefix ────────────────────────────────────────────
-  // Exclude the bare root path so RootController stays at "/" (a friendly
-  // landing/info response) instead of being prefixed to "/api/v1".
-  app.setGlobalPrefix('api/v1', { exclude: ['/'] });
+  app.setGlobalPrefix('api/v1');
 
-  // ── Swagger Docs (dev only) ───────────────────────────────
-  if (env !== 'production') {
+  // ── Swagger Docs ────────────────────────────────────────────
+  // Enabled in non-production OR when ENABLE_SWAGGER=true (Railway).
+  if (env !== 'production' || config.get('ENABLE_SWAGGER') === 'true') {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('Sira Platform API v4')
       .setDescription('Enterprise ISP & Device Management Platform')
@@ -79,7 +78,7 @@ async function bootstrap() {
     SwaggerModule.setup('api/docs', app, document, {
       swaggerOptions: { persistAuthorization: true },
     });
-    logger.log(`📚 Swagger docs available at: http://localhost:${port}/api/docs`);
+    logger.log(`📚 Swagger docs available at /api/docs`);
   }
 
   // Enable graceful shutdown hooks so onModuleDestroy handlers run on

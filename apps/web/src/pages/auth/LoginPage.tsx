@@ -129,7 +129,10 @@ export const LoginPage: React.FC = () => {
       await login(form.email, form.password, mode === 'company' ? form.companySlug || undefined : undefined);
       toast.success('مرحباً بك في Seera Platform ✓');
       navigate(mode === 'superadmin' ? '/god-mode' : from, { replace: true });
-    } catch {}
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'فشل تسجيل الدخول';
+      toast.error(typeof msg === 'string' ? msg : 'بيانات الدخول غير صحيحة');
+    }
   };
 
   return (
@@ -363,7 +366,7 @@ export const LoginPage: React.FC = () => {
             background: 'rgba(6,9,18,0.7)', borderTop: '1px solid rgba(99,102,241,0.07)',
           }}>
             <p style={{ fontSize: 10, color: '#4f46e5', fontFamily: 'monospace' }}>
-              © {new Date().getFullYear()} Seera Platform · v4.0
+              fghdhttdsffgyhd-ops.github.io/seera-alex2026
             </p>
             <p style={{ fontSize: 9, color: '#1e293b', marginTop: 3 }}>
               دعم دائم لخدمتك &nbsp;|&nbsp; Constant Technical Support &nbsp;|&nbsp; Постоянная Техническая Поддержка

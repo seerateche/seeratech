@@ -208,8 +208,11 @@ export const GodModeDashboard: React.FC = () => {
                           <Eye className="w-4 h-4" />
                         </button>
                         <button
+                          onClick={() => {
+                            setSelectedCompany(company);
+                          }}
                           className="btn-ghost btn-icon btn-sm"
-                          title="الطرفية"
+                          title="الطرفية — اختر جهاز من تفاصيل الشركة"
                         >
                           <Terminal className="w-4 h-4" />
                         </button>

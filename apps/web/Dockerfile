@@ -10,7 +10,8 @@ ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 WORKDIR /app
 
-COPY package.json ./
+# Copy root workspace config first (npm workspaces needs these)
+COPY package.json package-lock.json ./
 COPY packages/ ./packages/
 COPY apps/web/ ./apps/web/
 
@@ -22,18 +23,18 @@ RUN npm run build --workspace=apps/web
 FROM nginx:alpine
 
 COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
+# Copy as a template — envsubst replaces ${API_UPSTREAM} at runtime
+COPY apps/web/nginx.conf /etc/nginx/templates/default.conf.template
 
-# Use a templated config so nginx listens on Railway's injected $PORT.
-# nginx:alpine auto-processes templates in /etc/nginx/templates/*.template
-# via envsubst at container start, writing the result to /etc/nginx/conf.d/.
-COPY apps/web/nginx.conf.template /etc/nginx/templates/default.conf.template
+# Default API_UPSTREAM for Railway private networking.
+# Override via Railway Variables or docker-compose environment.
+ENV API_UPSTREAM=api.railway.internal:3001
 
-# Default for local/docker runs; Railway overrides PORT at runtime.
-ENV PORT=80
 EXPOSE 80
 
-# Health check hits the lightweight /healthz endpoint on the active port.
 HEALTHCHECK --interval=30s --timeout=5s \
-  CMD wget -qO- "http://localhost:${PORT}/healthz" || exit 1
+  CMD wget -qO- http://localhost:80 || exit 1
 
+# nginx:alpine's docker-entrypoint auto-runs envsubst on /etc/nginx/templates/
 CMD ["nginx", "-g", "daemon off;"]
+

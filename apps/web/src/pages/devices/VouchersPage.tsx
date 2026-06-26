@@ -260,7 +260,7 @@ export const VouchersPage: React.FC = () => {
                       <td>
                         <span className="text-xs text-slate-500 font-mono">
                           {v.status === 'active' || v.status === 'expired'
-                            ? `↑${formatBytes(v.usedBy ? 0 : 0)}`
+                            ? `↑${formatBytes((v.bytesIn ?? 0) + (v.bytesOut ?? 0))}`
                             : '—'}
                         </span>
                       </td>
