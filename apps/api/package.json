@@ -9,6 +9,8 @@
     "start": "node dist/main.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:seed": "ts-node seed.ts",
+    "db:setup": "drizzle-kit migrate && ts-node seed.ts",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
