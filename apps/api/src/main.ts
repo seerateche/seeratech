@@ -36,13 +36,55 @@ async function bootstrap() {
 
   app.use(compression());
 
-  // CORS
+  // ── CORS ──────────────────────────────────────────────────
+  // The single most common reason logins "silently fail" in production is a
+  // CORS mismatch: the browser blocks the request because the API's allowed
+  // origin list does not include the web app's deployed domain.
+  //
+  // Behaviour:
+  //  - Explicit allow-list from CORS_ORIGINS (comma-separated), always honoured.
+  //  - Any *.railway.app / *.up.railway.app origin is allowed automatically so
+  //    a fresh Railway deploy works even before CORS_ORIGINS is configured.
+  //  - Requests with no Origin header (curl, mobile apps, health checks,
+  //    same-origin) are allowed.
+  //  - Set CORS_ALLOW_ALL=true to allow every origin (use only for debugging).
+  const corsOrigins = config
+    .get<string>('CORS_ORIGINS', 'http://localhost:5173,http://localhost:3000')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  const allowAll = config.get('CORS_ALLOW_ALL') === 'true';
+
   app.enableCors({
-    origin: config.get('CORS_ORIGINS', 'http://localhost:5173').split(','),
+    origin: (origin, callback) => {
+      // Non-browser clients (no Origin) and explicit allow-all.
+      if (!origin || allowAll) return callback(null, true);
+
+      const isListed = corsOrigins.includes(origin);
+      const isRailway = /\.(up\.)?railway\.app$/i.test(
+        (() => {
+          try {
+            return new URL(origin).hostname;
+          } catch {
+            return '';
+          }
+        })(),
+      );
+
+      if (isListed || isRailway) return callback(null, true);
+
+      logger.warn(`🚫 CORS blocked origin: ${origin}`);
+      return callback(null, false);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Authorization', 'Content-Type', 'X-Company-Slug'],
   });
+  logger.log(
+    `🌐 CORS allow-list: ${corsOrigins.join(', ') || '(none)'}${
+      allowAll ? ' + ALL (debug)' : ' + *.railway.app'
+    }`,
+  );
 
   // ── Global Pipes ──────────────────────────────────────────
   app.useGlobalPipes(
