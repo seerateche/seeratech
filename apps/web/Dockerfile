@@ -4,14 +4,13 @@
 
 FROM node:20-alpine AS builder
 
-# Use VITE_API_BASE_URL as per the code in src/utils/api.ts
+# VITE_API_BASE_URL injection
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 WORKDIR /app
 
-# Copy root workspace config first (npm workspaces needs these)
-COPY package.json package-lock.json ./
+COPY package.json ./
 COPY packages/ ./packages/
 COPY apps/web/ ./apps/web/
 
@@ -23,18 +22,17 @@ RUN npm run build --workspace=apps/web
 FROM nginx:alpine
 
 COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
-# Copy as a template — envsubst replaces ${API_UPSTREAM} at runtime
-COPY apps/web/nginx.conf /etc/nginx/templates/default.conf.template
 
-# Default API_UPSTREAM for Railway private networking.
-# Override via Railway Variables or docker-compose environment.
-ENV API_UPSTREAM=api.railway.internal:3001
+# نسخ الملف الأساسي مباشرة (بدون استخدام الـ template الخطير)
+COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 
+# تحديد البورت الافتراضي
+ENV PORT=80
 EXPOSE 80
 
+# فحص الصحة
 HEALTHCHECK --interval=30s --timeout=5s \
-  CMD wget -qO- http://localhost:80 || exit 1
+  CMD wget -qO- "http://localhost:${PORT}/healthz" || exit 1
 
-# nginx:alpine's docker-entrypoint auto-runs envsubst on /etc/nginx/templates/
-CMD ["nginx", "-g", "daemon off;"]
-
+# تعديل البورت ديناميكياً باستخدام sed (آمن جداً) وتشغيل السيرفر
+CMD /bin/sh -c "sed -i 's/listen 80;/listen '${PORT}';/g' /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
