@@ -29,9 +29,18 @@ async function main() {
 
   // ── 1. Create connection ──────────────────────────────────
   const databaseUrl = process.env.DATABASE_URL;
-  const sslEnabled =
-    process.env.DB_SSL === 'true' ||
-    (!!databaseUrl && process.env.NODE_ENV === 'production');
+  const dbSslConfig = process.env.DB_SSL;
+
+  // 🔥 التعديل الجذري: إجبار السكريبت على احترام DB_SSL="false"
+  let sslEnabled = false;
+  if (dbSslConfig === 'false') {
+    sslEnabled = false;
+  } else if (dbSslConfig === 'true') {
+    sslEnabled = true;
+  } else {
+    sslEnabled = !!databaseUrl && process.env.NODE_ENV === 'production';
+  }
+  
   const ssl = sslEnabled ? { rejectUnauthorized: false } : false;
 
   const pool = databaseUrl
