@@ -18,16 +18,20 @@ export type DrizzleDB = ReturnType<typeof drizzle<typeof schema>>;
       provide: DRIZZLE_TOKEN,
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        // Railway (and most managed Postgres providers) expose a single
-        // DATABASE_URL connection string. Prefer it when present, otherwise
-        // fall back to the individual DB_* variables used in local/compose dev.
         const databaseUrl = config.get<string>('DATABASE_URL');
+        const dbSslConfig = config.get<string>('DB_SSL');
 
-        // Enable SSL automatically for managed providers (their URLs usually
-        // require it) or when explicitly requested via DB_SSL=true.
-        const sslEnabled =
-          config.get('DB_SSL') === 'true' ||
-          (!!databaseUrl && config.get('NODE_ENV') === 'production');
+        // 🔥 التعديل الجذري: إجبار الكود على احترام DB_SSL="false"
+        let sslEnabled = false;
+        if (dbSslConfig === 'false') {
+          sslEnabled = false; // إيقاف إجباري (عشان Railway)
+        } else if (dbSslConfig === 'true') {
+          sslEnabled = true;  // تشغيل إجباري
+        } else {
+          // الوضع الافتراضي لو المتغير مش موجود
+          sslEnabled = !!databaseUrl && config.get('NODE_ENV') === 'production';
+        }
+
         const ssl = sslEnabled ? { rejectUnauthorized: false } : false;
 
         const pool = databaseUrl
