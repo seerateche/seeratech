@@ -14,18 +14,15 @@ RUN apk add --no-cache python3 make g++
 
 # 1) Install ALL dependencies using root workspace config
 COPY package*.json ./
-COPY packages/shared/package*.json ./packages/shared/
 COPY apps/api/package*.json ./apps/api/
 COPY apps/web/package*.json ./apps/web/
 
 RUN npm ci --legacy-peer-deps
 
 # 2) Copy source files
-COPY packages/shared ./packages/shared
 COPY apps/api ./apps/api
 
-# 3) Build shared package first, then API
-#    This compiles migrate.ts → dist/database/migrate.js
+# 3) #    This compiles migrate.ts → dist/database/migrate.js
 #    and main.ts → dist/main.js via nest build
 RUN npm run build --workspace=packages/shared
 RUN npm run build --workspace=apps/api
