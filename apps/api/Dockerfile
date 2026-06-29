@@ -1,55 +1,48 @@
-# ============================================================
-# SEERA PLATFORM v4 - API Dockerfile (Multi-stage, Production-safe)
-# ============================================================
-
 # ── Stage 1: Builder ──────────────────────────────────────
 FROM node:20-alpine AS builder
 
-WORKDIR /app
-
-# 1) انقل كل الملفات الأول عشان الـ npm يشوف الـ package.json والملفات كلها
-COPY . .
-
-# Install native build deps
+# تثبيت أدوات البناء الأساسية
 RUN apk add --no-cache python3 make g++
 
-# 2) تسطيب المكتبات (استخدمنا install بدل ci عشان مشاكل الـ lockfile)
+WORKDIR /app
+
+# 1) نسخ ملفات المشروع الأساسية فقط للبدء
+COPY package*.json ./
+COPY apps/api/package*.json ./apps/api/
+COPY packages/shared/package*.json ./packages/shared/
+
+# 2) تنظيف وتثبيت نظيف تماماً بدون الاعتماد على أي ملفات محلية
+RUN npm cache clean --force
 RUN npm install --legacy-peer-deps
 
-# 3) ابني المشروع (تأكد إن Workspace مضبوطة في الـ package.json الرئيسي)
+# 3) نسخ باقي كود المصدر
+COPY . .
+
+# 4) بناء المشروع
 RUN npm run build --workspace=packages/shared
 RUN npm run build --workspace=apps/api
 
-# 4) تنظيف المكتبات غير الضرورية
+# 5) حذف المكتبات غير الضرورية (dev dependencies)
 RUN npm prune --omit=dev --workspace=apps/api --legacy-peer-deps
 
 # ── Stage 2: Production ───────────────────────────────────
 FROM node:20-alpine AS production
 
 WORKDIR /app
-
 ENV NODE_ENV=production
 
-# Runtime deps only
+# تثبيت أداة wget للـ Healthcheck
 RUN apk add --no-cache wget
 
-# Copy built JS output
+# نسخ النواتج فقط
 COPY --from=builder /app/apps/api/dist ./dist
-
-# Copy production node_modules
 COPY --from=builder /app/apps/api/node_modules ./node_modules
 COPY --from=builder /app/apps/api/package.json ./package.json
-
-# Copy Drizzle SQL migration files
 COPY --from=builder /app/apps/api/drizzle ./drizzle
 
-# Path where the migrator looks for .sql files
 ENV MIGRATIONS_DIR=/app/drizzle
 
-# Create writable runtime directories
 RUN mkdir -p /tmp/streams /tmp/uploads && chown -R node:node /tmp
-
-# Run as non-root for security
 USER node
 
 EXPOSE 3001
