@@ -5,12 +5,16 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Post,
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
+import { Inject } from '@nestjs/common';
+import { DRIZZLE_TOKEN, DrizzleDB } from '../../database/database.module';
+import { sql } from 'drizzle-orm';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -56,7 +60,46 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
+    @Inject(DRIZZLE_TOKEN) private readonly db: DrizzleDB,
   ) {}
+
+  // ── TEMP DEBUG: Remove after fixing login ─────────────────
+  @Public()
+  @Get('debug')
+  async debug() {
+    const checks: Record<string, any> = {};
+
+    // 1. Check env vars
+    checks.has_jwt_secret      = !!this.config.get('JWT_SECRET');
+    checks.has_refresh_secret  = !!this.config.get('JWT_REFRESH_SECRET');
+    checks.has_encryption_key  = !!this.config.get('ENCRYPTION_KEY');
+    checks.encryption_key_len  = (this.config.get<string>('ENCRYPTION_KEY') || '').length;
+    checks.has_database_url    = !!this.config.get('DATABASE_URL');
+    checks.node_env            = this.config.get('NODE_ENV');
+
+    // 2. Check DB tables exist
+    try {
+      const result = await this.db.execute(
+        sql`SELECT table_name FROM information_schema.tables
+            WHERE table_schema = 'public' ORDER BY table_name`
+      );
+      checks.tables = (result as any).rows?.map((r: any) => r.table_name) ?? result;
+      checks.db_connected = true;
+    } catch (e: any) {
+      checks.db_connected = false;
+      checks.db_error = e.message;
+    }
+
+    // 3. Check users table has rows
+    try {
+      const count = await this.db.execute(sql`SELECT COUNT(*) as cnt FROM users`);
+      checks.users_count = (count as any).rows?.[0]?.cnt ?? '?';
+    } catch (e: any) {
+      checks.users_count = `ERROR: ${e.message}`;
+    }
+
+    return checks;
+  }
 
   @Public()
   @Post('login')
