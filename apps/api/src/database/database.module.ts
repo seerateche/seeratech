@@ -21,15 +21,14 @@ export type DrizzleDB = ReturnType<typeof drizzle<typeof schema>>;
         const databaseUrl = config.get<string>('DATABASE_URL');
         const dbSslConfig = config.get<string>('DB_SSL');
 
-        // 🔥 التعديل الجذري: إجبار الكود على احترام DB_SSL="false"
         let sslEnabled = false;
         if (dbSslConfig === 'false') {
-          sslEnabled = false; // إيقاف إجباري (عشان Railway)
+          sslEnabled = false;
         } else if (dbSslConfig === 'true') {
-          sslEnabled = true;  // تشغيل إجباري
+          sslEnabled = true;
         } else {
-          // الوضع الافتراضي لو المتغير مش موجود
-          sslEnabled = !!databaseUrl && config.get('NODE_ENV') === 'production';
+          // Default to false because Railway internal PG doesn't support SSL
+          sslEnabled = false;
         }
 
         const ssl = sslEnabled ? { rejectUnauthorized: false } : false;

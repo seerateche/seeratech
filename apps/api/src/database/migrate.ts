@@ -28,11 +28,10 @@ async function main() {
   const databaseUrl = process.env.DATABASE_URL;
   const dbSslConfig  = process.env.DB_SSL;
 
-  // Explicit DB_SSL=false disables SSL even on DATABASE_URL.
   let sslEnabled: boolean;
   if (dbSslConfig === 'false')     sslEnabled = false;
   else if (dbSslConfig === 'true') sslEnabled = true;
-  else sslEnabled = !!databaseUrl && process.env.NODE_ENV === 'production';
+  else sslEnabled = false; // Default to false for Railway internal network
 
   const ssl: any = sslEnabled ? { rejectUnauthorized: false } : false;
 
