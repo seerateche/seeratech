@@ -13,9 +13,6 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++
 
 # 1) Install ALL dependencies using root workspace config
-COPY package*.json ./
-COPY apps/api/package*.json ./apps/api/
-COPY apps/web/package*.json ./apps/web/
 
 RUN npm ci --legacy-peer-deps
 
