@@ -14,7 +14,7 @@ RUN apk add --no-cache python3 make g++
 
 # 1) Install ALL dependencies using root workspace config
 
-RUN npm ci --legacy-peer-deps
+RUN npm install --legacy-peer
 
 # 2) Copy source files
 COPY apps/api ./apps/api
