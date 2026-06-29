@@ -1,58 +1,71 @@
 # ============================================================
-# SEERA PLATFORM v4 - API Dockerfile
+# SEERA PLATFORM v4 - API Dockerfile (Multi-stage, Production-safe)
+# Build context: repository root
+#   docker build -f apps/api/Dockerfile .
 # ============================================================
+
+# ── Stage 1: Builder ──────────────────────────────────────
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Install native build deps (needed by some npm packages)
+RUN apk add --no-cache python3 make g++
+
+# 1) Install ALL dependencies using root workspace config
 COPY package*.json ./
 COPY packages/shared/package*.json ./packages/shared/
 COPY apps/api/package*.json ./apps/api/
 
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
+# 2) Copy source files
 COPY packages/shared ./packages/shared
 COPY apps/api ./apps/api
 
+# 3) Build shared package first, then API
+#    This compiles migrate.ts → dist/database/migrate.js
+#    and main.ts → dist/main.js via nest build
 RUN npm run build --workspace=packages/shared
 RUN npm run build --workspace=apps/api
 
-FROM node:20-alpine AS runner
+# 4) Prune dev dependencies for production
+RUN npm prune --omit=dev --workspace=apps/api --legacy-peer-deps
+
+# ── Stage 2: Production ───────────────────────────────────
+FROM node:20-alpine AS production
 
 WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Runtime deps (wget for healthcheck)
+# Runtime deps only
 RUN apk add --no-cache wget
 
-# 🔥 1. تثبيت أداة tsx لتشغيل السكريبت مباشرة في بيئة الإنتاج
-RUN npm install -g tsx
-
-# 2. Copy built app + dependencies
-COPY --from=builder /app/apps/api/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
+# Copy built JS output (includes dist/database/migrate.js)
 COPY --from=builder /app/apps/api/dist ./dist
 
-# 🔥 3. نسخ مجلد src و tsconfig عشان السيرفر يلاقي ملف migrate.ts
-COPY --from=builder /app/apps/api/src ./src
-COPY --from=builder /app/apps/api/tsconfig.json ./
+# Copy production node_modules
+COPY --from=builder /app/apps/api/node_modules ./node_modules
+COPY --from=builder /app/apps/api/package.json ./package.json
 
-# 4. Copy Drizzle migration SQL files for programmatic migrator
+# Copy Drizzle SQL migration files (read at runtime by the migrator)
 COPY --from=builder /app/apps/api/drizzle ./drizzle
 
-# Tell the migration script where to find the SQL files
+# Path where the migrator looks for .sql files
 ENV MIGRATIONS_DIR=/app/drizzle
 
-# 5. Create runtime directories with correct permissions
-RUN mkdir -p /tmp/streams /tmp/uploads && \
-    chown -R node:node /tmp
+# Create writable runtime directories
+RUN mkdir -p /tmp/streams /tmp/uploads && chown -R node:node /tmp
+
+# Run as non-root for security
+USER node
 
 EXPOSE 3001
 
-HEALTHCHECK --interval=30s --timeout=10s \
-  --start-period=60s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=5 \
   CMD wget -qO- "http://localhost:${PORT:-3001}/api/v1/health" || exit 1
 
-# 🔥 6. تشغيل ملف الداتا بيز بـ tsx ثم تشغيل السيرفر الرئيسي
-CMD ["sh", "-c", "tsx src/database/migrate.ts && node dist/main.js"]
+# Step 1: node dist/database/migrate.js — runs migrations + seed (no ts-node, no tsx, no drizzle-kit CLI)
+# Step 2: node dist/main.js             — starts NestJS application
+CMD ["sh", "-c", "node dist/database/migrate.js && node dist/main.js"]
