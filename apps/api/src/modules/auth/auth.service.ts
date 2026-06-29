@@ -231,13 +231,21 @@ export class AuthService {
       companyId: user.companyId,
     };
 
+    const jwtSecret        = this.config.get<string>('JWT_SECRET');
+    const jwtRefreshSecret = this.config.get<string>('JWT_REFRESH_SECRET') || jwtSecret;
+
+    if (!jwtSecret) {
+      this.logger.error('JWT_SECRET is not set — cannot issue tokens');
+      throw new Error('Server misconfiguration: JWT_SECRET missing');
+    }
+
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
-        secret: this.config.get('JWT_SECRET'),
+        secret: jwtSecret,
         expiresIn: '15m',
       }),
       this.jwtService.signAsync(payload, {
-        secret: this.config.get('JWT_REFRESH_SECRET'),
+        secret: jwtRefreshSecret,
         expiresIn: '7d',
       }),
     ]);
