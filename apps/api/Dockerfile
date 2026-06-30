@@ -16,6 +16,7 @@ RUN apk add --no-cache python3 make g++
 COPY package*.json ./
 COPY packages/shared/package*.json ./packages/shared/
 COPY apps/api/package*.json ./apps/api/
+COPY apps/web/package*.json ./apps/web/
 
 RUN npm ci --legacy-peer-deps
 
