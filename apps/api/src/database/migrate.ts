@@ -10,7 +10,6 @@
 //  3. Seeds the Super Admin and demo company if they don't exist
 //  4. Exits 0 → Docker CMD runs node dist/main.js
 // ============================================================
-import 'dotenv/config';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
