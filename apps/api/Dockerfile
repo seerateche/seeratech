@@ -9,6 +9,7 @@ WORKDIR /app
 # 1) نسخ ملفات المشروع الأساسية فقط للبدء
 COPY package*.json ./
 COPY apps/api/package*.json ./apps/api/
+COPY apps/web/package*.json ./apps/web/
 COPY packages/shared/package*.json ./packages/shared/
 
 # 2) تنظيف وتثبيت نظيف تماماً بدون الاعتماد على أي ملفات محلية
