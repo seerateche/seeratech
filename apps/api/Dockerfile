@@ -24,7 +24,13 @@ RUN npm run build --workspace=packages/shared
 RUN npm run build --workspace=apps/api
 
 # 5) حذف المكتبات غير الضرورية (dev dependencies)
-RUN npm prune --omit=dev --workspace=apps/api --legacy-peer-deps
+RUN npm prune --omit=dev --legacy-peer-deps
+
+# 6) Replace workspace symlink with actual files
+RUN rm -rf /app/node_modules/@sira/shared \
+    && mkdir -p /app/node_modules/@sira/shared \
+    && cp -R /app/packages/shared/dist /app/node_modules/@sira/shared/dist \
+    && cp /app/packages/shared/package.json /app/node_modules/@sira/shared/package.json
 
 # ── Stage 2: Production ───────────────────────────────────
 FROM node:20-alpine AS production
@@ -37,7 +43,7 @@ RUN apk add --no-cache wget
 
 # نسخ النواتج فقط
 COPY --from=builder /app/apps/api/dist ./dist
-COPY --from=builder /app/apps/api/node_modules ./node_modules
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/api/package.json ./package.json
 COPY --from=builder /app/apps/api/drizzle ./drizzle
 
