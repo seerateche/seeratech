@@ -63,34 +63,50 @@ export class AuthController {
     @Inject(DRIZZLE_TOKEN) private readonly db: DrizzleDB,
   ) {}
 
-  // ── TEMP DEBUG: Remove after fixing login ─────────────────
+  // ── TEMP DEBUG: visit /api/v1/auth/debug to diagnose login ────
+  // Shows whether the required env vars are present, whether the DB is
+  // reachable, which tables exist, and how many users are seeded.
   @Public()
   @Get('debug')
   async debug() {
     const checks: Record<string, any> = {};
 
-    // 1. Check env vars
+    // 1. Required env vars (booleans only — never leak secret values)
     checks.has_jwt_secret      = !!this.config.get('JWT_SECRET');
     checks.has_refresh_secret  = !!this.config.get('JWT_REFRESH_SECRET');
     checks.has_encryption_key  = !!this.config.get('ENCRYPTION_KEY');
     checks.encryption_key_len  = (this.config.get<string>('ENCRYPTION_KEY') || '').length;
     checks.has_database_url    = !!this.config.get('DATABASE_URL');
     checks.node_env            = this.config.get('NODE_ENV');
+    checks.db_ssl              = this.config.get('DB_SSL') ?? '(unset → default)';
 
-    // 2. Check DB tables exist
+    // 2. Which Postgres are we actually connected to?
     try {
-      const result = await this.db.execute(
-        sql`SELECT table_name FROM information_schema.tables
-            WHERE table_schema = 'public' ORDER BY table_name`
+      const info = await this.db.execute(
+        sql`SELECT current_database() AS db, current_user AS usr, version() AS ver`,
       );
-      checks.tables = (result as any).rows?.map((r: any) => r.table_name) ?? result;
+      const row = (info as any).rows?.[0] ?? {};
       checks.db_connected = true;
+      checks.db_name = row.db;
+      checks.db_user = row.usr;
     } catch (e: any) {
       checks.db_connected = false;
       checks.db_error = e.message;
     }
 
-    // 3. Check users table has rows
+    // 3. Which tables exist
+    try {
+      const result = await this.db.execute(
+        sql`SELECT table_name FROM information_schema.tables
+            WHERE table_schema = 'public' ORDER BY table_name`,
+      );
+      checks.tables = (result as any).rows?.map((r: any) => r.table_name) ?? [];
+      checks.tables_count = checks.tables.length;
+    } catch (e: any) {
+      checks.tables = `ERROR: ${e.message}`;
+    }
+
+    // 4. How many users are seeded
     try {
       const count = await this.db.execute(sql`SELECT COUNT(*) as cnt FROM users`);
       checks.users_count = (count as any).rows?.[0]?.cnt ?? '?';
@@ -98,7 +114,71 @@ export class AuthController {
       checks.users_count = `ERROR: ${e.message}`;
     }
 
+    // 5. Verdict — a human-readable summary of what to fix
+    const problems: string[] = [];
+    if (!checks.has_jwt_secret)     problems.push('JWT_SECRET missing');
+    if (!checks.has_encryption_key) problems.push('ENCRYPTION_KEY missing');
+    if (checks.has_encryption_key && checks.encryption_key_len !== 64)
+      problems.push(`ENCRYPTION_KEY must be 64 hex chars (got ${checks.encryption_key_len})`);
+    if (!checks.db_connected)       problems.push('cannot connect to database');
+    if (checks.tables_count === 0)  problems.push('no tables — migrations did not run (POST /api/v1/auth/run-migrations)');
+    if (checks.users_count === '0' || checks.users_count === 0)
+      problems.push('no users — seed did not run');
+    checks.verdict = problems.length ? problems : 'OK — login should work';
+
     return checks;
+  }
+
+  // ── TEMP: manually run migrations + seed if boot-time migrate failed ──
+  // Protected by a one-time secret so it can't be abused. Set MIGRATION_SECRET
+  // in the API service, then: POST /api/v1/auth/run-migrations  {"secret":"..."}
+  @Public()
+  @Post('run-migrations')
+  @HttpCode(HttpStatus.OK)
+  async runMigrations(@Body() body: { secret?: string }) {
+    const expected = this.config.get<string>('MIGRATION_SECRET');
+    if (!expected || body?.secret !== expected) {
+      throw new UnauthorizedException('Invalid or missing migration secret');
+    }
+
+    const out: Record<string, any> = {};
+    try {
+      // Run the SQL migrations against the live connection.
+      const { migrate } = await import('drizzle-orm/node-postgres/migrator');
+      const path = await import('path');
+      const migrationsFolder =
+        process.env.MIGRATIONS_DIR || path.resolve(__dirname, '..', '..', '..', 'drizzle');
+      out.migrationsFolder = migrationsFolder;
+      await migrate(this.db as any, { migrationsFolder });
+      out.migrations = 'applied';
+    } catch (e: any) {
+      out.migrations = `ERROR: ${e.message}`;
+      return out;
+    }
+
+    // Seed default super admin if missing.
+    try {
+      const bcrypt = await import('bcryptjs');
+      const email = this.config.get<string>('SEED_SUPER_ADMIN_EMAIL') || 'superadmin@seera.local';
+      const pwd   = this.config.get<string>('SEED_SUPER_ADMIN_PASSWORD') || 'Change_Me_2025!';
+      const existing = await this.db.execute(
+        sql`SELECT 1 FROM users WHERE email = ${email} LIMIT 1`,
+      );
+      if (((existing as any).rows?.length ?? 0) === 0) {
+        const hash = await bcrypt.hash(pwd, 12);
+        await this.db.execute(
+          sql`INSERT INTO users (email, name, password_hash, role, is_active)
+              VALUES (${email}, 'Super Administrator', ${hash}, 'super_admin', true)`,
+        );
+        out.superAdmin = `created: ${email}`;
+      } else {
+        out.superAdmin = `already exists: ${email}`;
+      }
+    } catch (e: any) {
+      out.superAdmin = `ERROR: ${e.message}`;
+    }
+
+    return out;
   }
 
   @Public()
