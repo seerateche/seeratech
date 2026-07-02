@@ -41,7 +41,7 @@ export class ZkService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  private async getZkInstance(deviceId: string): Promise<any> {
+  private async getZkInstance(deviceId: string, companyId: string): Promise<any> {
     if (this.zkConnections.has(deviceId)) {
       return this.zkConnections.get(deviceId);
     }
@@ -53,6 +53,7 @@ export class ZkService {
       .limit(1);
 
     if (!device) throw new Error(`جهاز البصمة ${deviceId} غير موجود`);
+    if (device.companyId !== companyId) throw new Error('غير مصرح لك بالوصول لهذا الجهاز');
 
     const creds = this.security.decryptCredentials(
       device.encryptedUsername,
@@ -92,7 +93,7 @@ export class ZkService {
    * Uses upsert to avoid duplicates.
    */
   async syncAttendanceLogs(deviceId: string, companyId: string): Promise<number> {
-    const zk = await this.getZkInstance(deviceId);
+    const zk = await this.getZkInstance(deviceId, companyId);
 
     // Get employees (users) from the device
     const zkUsers: ZKUser[] = await new Promise((resolve, reject) => {
@@ -204,7 +205,7 @@ export class ZkService {
       return;
     }
 
-    const zk = await this.getZkInstance(deviceId);
+    const zk = await this.getZkInstance(deviceId, companyId);
 
     zk.startMon((err: Error | null) => {
       if (err) {

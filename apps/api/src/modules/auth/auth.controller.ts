@@ -11,6 +11,7 @@ import {
   Post,
   UnauthorizedException,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
 import { DRIZZLE_TOKEN, DrizzleDB } from '../../database/database.module';
@@ -68,7 +69,13 @@ export class AuthController {
   // reachable, which tables exist, and how many users are seeded.
   @Public()
   @Get('debug')
-  async debug() {
+  async debug(@Query('secret') secret?: string) {
+    if (this.config.get('NODE_ENV') === 'production') {
+      const expectedSecret = this.config.get('MIGRATION_SECRET');
+      if (!expectedSecret || secret !== expectedSecret) {
+        throw new UnauthorizedException('Unauthorized');
+      }
+    }
     const checks: Record<string, any> = {};
 
     // 1. Required env vars (booleans only — never leak secret values)

@@ -86,7 +86,12 @@ async function main() {
   console.log('\n🌱 Checking seed data...');
 
   const superAdminEmail = process.env.SEED_SUPER_ADMIN_EMAIL    || 'superadmin@seera.local';
-  const superAdminPwd   = process.env.SEED_SUPER_ADMIN_PASSWORD || 'Seera_Admin_2025!';
+  const superAdminPwd   = process.env.SEED_SUPER_ADMIN_PASSWORD;
+
+  if (!superAdminPwd) {
+    throw new Error('FATAL: SEED_SUPER_ADMIN_PASSWORD environment variable is not set. Refusing to seed default admin with a hardcoded password.');
+  }
+
   const superAdminName  = process.env.SEED_SUPER_ADMIN_NAME     || 'Super Administrator';
 
   try {

@@ -109,7 +109,7 @@ export class VouchersService {
   async syncFromDevice(user: AuthTokenPayload, deviceId: string) {
     const companyId =
       user.role === UserRole.SUPER_ADMIN ? null : user.companyId;
-    await this.mikrotik.syncVoucherStatus(deviceId, companyId ?? '');
+    await this.mikrotik.syncVoucherStatus(deviceId, companyId ?? '', user);
     return { synced: true };
   }
 

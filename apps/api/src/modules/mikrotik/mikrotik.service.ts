@@ -433,8 +433,9 @@ export class MikroTikService implements OnModuleDestroy {
     return { batchId: batch.id, vouchers: codes };
   }
 
-  async syncVoucherStatus(deviceId: string, companyId: string): Promise<void> {
-    const api         = await this.getConnection(deviceId);
+  async syncVoucherStatus(deviceId: string, companyId: string, user?: AuthTokenPayload): Promise<void> {
+    const device      = await this.assertDeviceOwned(deviceId, user);
+    const api         = await this.getConnection(deviceId, device);
     const activeUsers = await api.write('/ip/hotspot/active/print');
     const activeUserMap = new Map<string, any>();
     (activeUsers as any[]).forEach((u) => activeUserMap.set(u['user'], u));
@@ -640,8 +641,10 @@ export class MikroTikService implements OnModuleDestroy {
   async executeTerminalCommand(
     deviceId: string,
     command:  string,
+    user?:    AuthTokenPayload,
   ): Promise<{ output: string; error?: string }> {
-    const api = await this.getConnection(deviceId);
+    const device = await this.assertDeviceOwned(deviceId, user);
+    const api = await this.getConnection(deviceId, device);
 
     const BLOCKED = ['/system/reset-configuration', '/system/format-storage'];
     const norm    = command.trim().toLowerCase().replace(/\s+/g, '/');

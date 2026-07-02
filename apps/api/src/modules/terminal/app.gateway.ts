@@ -118,6 +118,8 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const { deviceId } = data;
 
     try {
+      await this.mikrotik.assertDeviceOwned(deviceId, user);
+      
       // Create audit session
       const sessionToken = uuidv4();
       const [session] = await this.db
@@ -182,6 +184,7 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const result = await this.mikrotik.executeTerminalCommand(
         session.deviceId,
         command,
+        client.user,
       );
 
       if (result.error) {

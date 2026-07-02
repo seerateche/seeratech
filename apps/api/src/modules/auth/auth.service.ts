@@ -182,20 +182,22 @@ export class AuthService {
         throw new UnauthorizedException('المستخدم غير مرتبط بشركة');
       }
 
-      if (companySlug) {
-        const [company] = await this.db
-          .select({ id: companies.id, slug: companies.slug, status: companies.status })
-          .from(companies)
-          .where(eq(companies.id, user.companyId))
-          .limit(1);
+      const [company] = await this.db
+        .select({ id: companies.id, slug: companies.slug, status: companies.status })
+        .from(companies)
+        .where(eq(companies.id, user.companyId))
+        .limit(1);
 
-        if (!company || company.slug !== companySlug) {
-          throw new UnauthorizedException('الشركة غير موجودة');
-        }
+      if (!company) {
+        throw new UnauthorizedException('الشركة غير موجودة');
+      }
 
-        if (company.status === 'suspended') {
-          throw new ForbiddenException('حساب الشركة موقوف');
-        }
+      if (company.status === 'suspended') {
+        throw new ForbiddenException('حساب الشركة موقوف');
+      }
+
+      if (companySlug && company.slug !== companySlug) {
+        throw new UnauthorizedException('الشركة غير موجودة');
       }
     }
 

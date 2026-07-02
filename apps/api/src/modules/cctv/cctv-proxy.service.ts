@@ -48,7 +48,7 @@ export class CctvProxyService {
    * Starts an RTSP → HLS transcoding session for a CCTV device.
    * Returns the HLS manifest URL path.
    */
-  async startStream(deviceId: string): Promise<{ hlsUrl: string; sessionId: string }> {
+  async startStream(deviceId: string, user?: any): Promise<{ hlsUrl: string; sessionId: string }> {
     // Return existing session if active
     if (this.activeSessions.has(deviceId)) {
       const session = this.activeSessions.get(deviceId)!;
@@ -67,6 +67,9 @@ export class CctvProxyService {
       .limit(1);
 
     if (!device) throw new NotFoundException('كاميرا CCTV غير موجودة');
+    if (user && user.role !== 'super_admin' && device.companyId !== user.companyId) {
+      throw new NotFoundException('كاميرا CCTV غير موجودة');
+    }
     if (device.type !== 'dvr' && device.type !== 'nvr') {
       throw new NotFoundException('الجهاز ليس DVR/NVR');
     }
@@ -212,14 +215,20 @@ export class CctvProxyService {
     );
   }
 
-  async getActiveStreams(): Promise<
+  async getActiveStreams(user?: any): Promise<
     Array<{ deviceId: string; startedAt: Date; watchers: number }>
   > {
-    return Array.from(this.activeSessions.values()).map((s) => ({
+    const streams = Array.from(this.activeSessions.values()).map((s) => ({
       deviceId: s.deviceId,
       startedAt: s.startedAt,
       watchers: s.watcherCount,
     }));
+    if (user && user.role !== 'super_admin') {
+      const allowedDevices = await this.db.select({ id: devices.id }).from(devices).where(eq(devices.companyId, user.companyId));
+      const allowedIds = new Set(allowedDevices.map(d => d.id));
+      return streams.filter(s => allowedIds.has(s.deviceId));
+    }
+    return streams;
   }
 
   // Cleanup on module destroy
