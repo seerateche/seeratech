@@ -23,8 +23,7 @@ COPY . .
 RUN npm run build --workspace=packages/shared
 RUN npm run build --workspace=apps/api
 
-# 5) حذف المكتبات غير الضرورية (dev dependencies)
-RUN npm prune --omit=dev --legacy-peer-deps
+# 5) Skip npm prune to prevent deleting workspace dependencies
 
 # 6) Replace workspace symlink with actual files
 RUN rm -rf /app/node_modules/@sira/shared \
@@ -35,7 +34,7 @@ RUN rm -rf /app/node_modules/@sira/shared \
 # ── Stage 2: Production ───────────────────────────────────
 FROM node:20-alpine AS production
 
-WORKDIR /app
+WORKDIR /app/apps/api
 ENV NODE_ENV=production
 
 # تثبيت أداة wget للـ Healthcheck
@@ -43,11 +42,14 @@ RUN apk add --no-cache wget
 
 # نسخ النواتج فقط
 COPY --from=builder /app/apps/api/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/node_modules /app/node_modules
 COPY --from=builder /app/apps/api/package.json ./package.json
 COPY --from=builder /app/apps/api/drizzle ./drizzle
 
-ENV MIGRATIONS_DIR=/app/drizzle
+# Copy the un-hoisted node_modules if it exists (using a wildcard so it doesn't fail if it doesn't exist)
+COPY --from=builder /app/apps/api/node_module[s] ./node_modules
+
+ENV MIGRATIONS_DIR=/app/apps/api/drizzle
 
 RUN mkdir -p /tmp/streams /tmp/uploads && chown -R node:node /tmp
 USER node
