@@ -5,10 +5,12 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
   Post,
+  Query,
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
@@ -16,6 +18,7 @@ import { Inject } from '@nestjs/common';
 import { DRIZZLE_TOKEN, DrizzleDB } from '../../database/database.module';
 import { sql } from 'drizzle-orm';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -63,12 +66,31 @@ export class AuthController {
     @Inject(DRIZZLE_TOKEN) private readonly db: DrizzleDB,
   ) {}
 
-  // ── TEMP DEBUG: visit /api/v1/auth/debug to diagnose login ────
-  // Shows whether the required env vars are present, whether the DB is
-  // reachable, which tables exist, and how many users are seeded.
+  // ── DIAGNOSTIC: /api/v1/auth/debug to diagnose login problems ────
+  // Reports whether required env vars are present, whether the DB is reachable,
+  // which tables exist, and how many users are seeded.
+  //
+  // SECURITY: this endpoint leaks infrastructure details (table names, db
+  // user/name, counts). In production it is therefore locked behind the
+  // MIGRATION_SECRET — call it as /auth/debug?secret=<MIGRATION_SECRET>.
+  // In non-production it stays open for convenience. If MIGRATION_SECRET is
+  // not configured in production, the endpoint refuses to answer at all.
   @Public()
   @Get('debug')
-  async debug() {
+  async debug(@Query('secret') secret?: string) {
+    const isProd = this.config.get<string>('NODE_ENV') === 'production';
+    if (isProd) {
+      const expected = this.config.get<string>('MIGRATION_SECRET');
+      if (!expected) {
+        throw new ForbiddenException(
+          'Diagnostics disabled: set MIGRATION_SECRET and pass ?secret=',
+        );
+      }
+      if (secret !== expected) {
+        throw new ForbiddenException('Invalid or missing diagnostics secret');
+      }
+    }
+
     const checks: Record<string, any> = {};
 
     // 1. Required env vars (booleans only — never leak secret values)
@@ -160,7 +182,20 @@ export class AuthController {
     try {
       const bcrypt = await import('bcryptjs');
       const email = this.config.get<string>('SEED_SUPER_ADMIN_EMAIL') || 'superadmin@seera.local';
-      const pwd   = this.config.get<string>('SEED_SUPER_ADMIN_PASSWORD') || 'Change_Me_2025!';
+      const configuredPwd = this.config.get<string>('SEED_SUPER_ADMIN_PASSWORD');
+      const isProd = this.config.get<string>('NODE_ENV') === 'production';
+
+      // In production, refuse to create a super-admin with a well-known
+      // hardcoded password. The operator must set SEED_SUPER_ADMIN_PASSWORD.
+      if (isProd && !configuredPwd) {
+        out.superAdmin =
+          'SKIPPED: set SEED_SUPER_ADMIN_PASSWORD before seeding the super admin in production';
+        return out;
+      }
+
+      // Default matches the boot-time seeder (migrate.ts) for consistency in
+      // non-production environments only.
+      const pwd = configuredPwd || 'Seera_Admin_2025!';
       const existing = await this.db.execute(
         sql`SELECT 1 FROM users WHERE email = ${email} LIMIT 1`,
       );
@@ -182,6 +217,10 @@ export class AuthController {
   }
 
   @Public()
+  // Stricter rate limit for credential endpoints: 10 attempts / minute / IP
+  // (the dedicated 'auth' throttler configured in app.module.ts). Without this
+  // decorator only the loose global 100/min limit applied.
+  @Throttle({ auth: { limit: 10, ttl: 60000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login with email + password' })
@@ -190,6 +229,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ auth: { limit: 10, ttl: 60000 } })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access token using a refresh token' })

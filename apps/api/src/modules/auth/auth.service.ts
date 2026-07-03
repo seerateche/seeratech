@@ -182,20 +182,28 @@ export class AuthService {
         throw new UnauthorizedException('المستخدم غير مرتبط بشركة');
       }
 
-      if (companySlug) {
-        const [company] = await this.db
-          .select({ id: companies.id, slug: companies.slug, status: companies.status })
-          .from(companies)
-          .where(eq(companies.id, user.companyId))
-          .limit(1);
+      // Always load the user's company — the suspension check MUST run for
+      // every non-super-admin login, regardless of whether the optional
+      // companySlug was supplied. (Previously the check lived inside the
+      // `if (companySlug)` block, so a request omitting the slug bypassed it.)
+      const [company] = await this.db
+        .select({ id: companies.id, slug: companies.slug, status: companies.status })
+        .from(companies)
+        .where(eq(companies.id, user.companyId))
+        .limit(1);
 
-        if (!company || company.slug !== companySlug) {
-          throw new UnauthorizedException('الشركة غير موجودة');
-        }
+      if (!company) {
+        throw new UnauthorizedException('الشركة غير موجودة');
+      }
 
-        if (company.status === 'suspended') {
-          throw new ForbiddenException('حساب الشركة موقوف');
-        }
+      // When a slug is provided it must match the user's company.
+      if (companySlug && company.slug !== companySlug) {
+        throw new UnauthorizedException('الشركة غير موجودة');
+      }
+
+      // Suspended companies can never log in — enforced unconditionally.
+      if (company.status === 'suspended') {
+        throw new ForbiddenException('حساب الشركة موقوف');
       }
     }
 
