@@ -22,14 +22,18 @@ import { DRIZZLE_TOKEN, DrizzleDB } from '../../database/database.module';
 import { terminalSessions, users } from '../../database/schema';
 import { MikroTikService } from '../mikrotik/mikrotik.service';
 import { AuthTokenPayload, UserRole, WsEvent } from '@sira/shared';
+import { createCorsOriginValidator } from '../../common/cors-origin';
 
 interface AuthenticatedSocket extends Socket {
   user: AuthTokenPayload;
 }
 
 @WebSocketGateway({
+  // Reuse the same allow-list logic as the REST server (main.ts) instead of a
+  // wide-open origin:'*'. Any-origin WebSocket + credentials is a CSRF-style
+  // risk; this restricts connections to configured / *.railway.app origins.
   cors: {
-    origin: '*',
+    origin: createCorsOriginValidator(),
     credentials: true,
   },
   namespace: '/ws',
