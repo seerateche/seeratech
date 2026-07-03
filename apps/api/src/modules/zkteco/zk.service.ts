@@ -1,13 +1,13 @@
 // ============================================================
 // SIRA PLATFORM v4 - ZKTeco Biometric Service
 // ============================================================
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Logger, Inject, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { DRIZZLE_TOKEN, DrizzleDB } from '../../database/database.module';
 import { devices, attendanceLogs, employees } from '../../database/schema';
 import { SecurityService } from '../../security/security.service';
-import { AttendanceEventType } from '@sira/shared';
+import { AttendanceEventType, AuthTokenPayload, UserRole } from '@sira/shared';
 
 // ZKLib types
 interface ZKUser {
@@ -41,18 +41,38 @@ export class ZkService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  private async getZkInstance(deviceId: string): Promise<any> {
+  /**
+   * Tenant isolation: resolves a device scoped to the caller's company.
+   * Super-admins reach any device; everyone else is restricted to their own.
+   * Throws NotFound (never leaks existence) for out-of-tenant devices.
+   */
+  private async assertDeviceOwned(
+    deviceId: string,
+    user?: AuthTokenPayload,
+  ): Promise<typeof devices.$inferSelect> {
+    const scopedCompanyId =
+      user && user.role !== UserRole.SUPER_ADMIN ? user.companyId : null;
+
+    const where = scopedCompanyId
+      ? and(eq(devices.id, deviceId), eq(devices.companyId, scopedCompanyId))
+      : eq(devices.id, deviceId);
+
+    const [device] = await this.db.select().from(devices).where(where).limit(1);
+    if (!device) throw new NotFoundException(`جهاز البصمة ${deviceId} غير موجود`);
+    return device;
+  }
+
+  private async getZkInstance(
+    deviceId: string,
+    user?: AuthTokenPayload,
+  ): Promise<any> {
+    // Always verify ownership first — even for a pooled connection — so a
+    // company_admin can never reach another company's biometric device.
+    const device = await this.assertDeviceOwned(deviceId, user);
+
     if (this.zkConnections.has(deviceId)) {
       return this.zkConnections.get(deviceId);
     }
-
-    const [device] = await this.db
-      .select()
-      .from(devices)
-      .where(eq(devices.id, deviceId))
-      .limit(1);
-
-    if (!device) throw new Error(`جهاز البصمة ${deviceId} غير موجود`);
 
     const creds = this.security.decryptCredentials(
       device.encryptedUsername,
@@ -91,8 +111,12 @@ export class ZkService {
    * Pulls ALL attendance logs from the ZKTeco device and syncs to PostgreSQL.
    * Uses upsert to avoid duplicates.
    */
-  async syncAttendanceLogs(deviceId: string, companyId: string): Promise<number> {
-    const zk = await this.getZkInstance(deviceId);
+  async syncAttendanceLogs(
+    deviceId: string,
+    companyId: string,
+    user?: AuthTokenPayload,
+  ): Promise<number> {
+    const zk = await this.getZkInstance(deviceId, user);
 
     // Get employees (users) from the device
     const zkUsers: ZKUser[] = await new Promise((resolve, reject) => {
@@ -198,13 +222,17 @@ export class ZkService {
    * Starts real-time attendance event listener.
    * Emits events via EventEmitter2 for WebSocket broadcasting.
    */
-  async startRealtimeListener(deviceId: string, companyId: string): Promise<void> {
+  async startRealtimeListener(
+    deviceId: string,
+    companyId: string,
+    user?: AuthTokenPayload,
+  ): Promise<void> {
     if (this.realtimeListeners.get(deviceId)) {
       this.logger.debug(`Real-time listener already active for device ${deviceId}`);
       return;
     }
 
-    const zk = await this.getZkInstance(deviceId);
+    const zk = await this.getZkInstance(deviceId, user);
 
     zk.startMon((err: Error | null) => {
       if (err) {

@@ -118,6 +118,11 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const { deviceId } = data;
 
     try {
+      // Tenant isolation: verify the caller actually owns this device before
+      // opening a RouterOS terminal on it. Throws NotFound (never leaks
+      // existence) for devices outside the caller's company.
+      await this.mikrotik.assertDeviceOwned(deviceId, user);
+
       // Create audit session
       const sessionToken = uuidv4();
       const [session] = await this.db
@@ -182,6 +187,7 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const result = await this.mikrotik.executeTerminalCommand(
         session.deviceId,
         command,
+        client.user,
       );
 
       if (result.error) {

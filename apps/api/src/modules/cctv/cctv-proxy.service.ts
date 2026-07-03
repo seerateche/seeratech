@@ -12,10 +12,11 @@ import { ConfigService } from '@nestjs/config';
 import ffmpeg from 'fluent-ffmpeg';
 import * as fs from 'fs';
 import * as path from 'path';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { DRIZZLE_TOKEN, DrizzleDB } from '../../database/database.module';
 import { devices } from '../../database/schema';
 import { SecurityService } from '../../security/security.service';
+import { AuthTokenPayload, UserRole } from '@sira/shared';
 
 interface StreamSession {
   deviceId: string;
@@ -45,10 +46,39 @@ export class CctvProxyService {
   }
 
   /**
+   * Tenant isolation: resolves a device scoped to the caller's company.
+   * Super-admins reach any device; everyone else only their own. Throws
+   * NotFound (never leaks existence) for out-of-tenant devices.
+   */
+  private async assertDeviceOwned(
+    deviceId: string,
+    user?: AuthTokenPayload,
+  ): Promise<typeof devices.$inferSelect> {
+    const scopedCompanyId =
+      user && user.role !== UserRole.SUPER_ADMIN ? user.companyId : null;
+
+    const where = scopedCompanyId
+      ? and(eq(devices.id, deviceId), eq(devices.companyId, scopedCompanyId))
+      : eq(devices.id, deviceId);
+
+    const [device] = await this.db.select().from(devices).where(where).limit(1);
+    if (!device) throw new NotFoundException('كاميرا CCTV غير موجودة');
+    return device;
+  }
+
+  /**
    * Starts an RTSP → HLS transcoding session for a CCTV device.
    * Returns the HLS manifest URL path.
    */
-  async startStream(deviceId: string): Promise<{ hlsUrl: string; sessionId: string }> {
+  async startStream(
+    deviceId: string,
+    user?: AuthTokenPayload,
+  ): Promise<{ hlsUrl: string; sessionId: string }> {
+    // Tenant isolation: verify the caller owns this camera before doing
+    // anything — including reusing an existing session. Throws NotFound
+    // (never leaks existence) for cameras outside the caller's company.
+    const device = await this.assertDeviceOwned(deviceId, user);
+
     // Return existing session if active
     if (this.activeSessions.has(deviceId)) {
       const session = this.activeSessions.get(deviceId)!;
@@ -59,14 +89,6 @@ export class CctvProxyService {
       };
     }
 
-    // Load device
-    const [device] = await this.db
-      .select()
-      .from(devices)
-      .where(eq(devices.id, deviceId))
-      .limit(1);
-
-    if (!device) throw new NotFoundException('كاميرا CCTV غير موجودة');
     if (device.type !== 'dvr' && device.type !== 'nvr') {
       throw new NotFoundException('الجهاز ليس DVR/NVR');
     }
@@ -152,7 +174,10 @@ export class CctvProxyService {
     };
   }
 
-  async stopStream(deviceId: string): Promise<void> {
+  async stopStream(deviceId: string, user?: AuthTokenPayload): Promise<void> {
+    // Tenant isolation: only the owner (or super-admin) may stop a stream.
+    await this.assertDeviceOwned(deviceId, user);
+
     const session = this.activeSessions.get(deviceId);
     if (!session) return;
 
@@ -212,10 +237,31 @@ export class CctvProxyService {
     );
   }
 
-  async getActiveStreams(): Promise<
-    Array<{ deviceId: string; startedAt: Date; watchers: number }>
-  > {
-    return Array.from(this.activeSessions.values()).map((s) => ({
+  async getActiveStreams(
+    user?: AuthTokenPayload,
+  ): Promise<Array<{ deviceId: string; startedAt: Date; watchers: number }>> {
+    const sessions = Array.from(this.activeSessions.values());
+    if (sessions.length === 0) return [];
+
+    // Tenant isolation: super-admins see all active streams; everyone else
+    // only sees streams for devices owned by their own company.
+    if (user && user.role !== UserRole.SUPER_ADMIN) {
+      if (!user.companyId) return [];
+      const owned = await this.db
+        .select({ id: devices.id })
+        .from(devices)
+        .where(eq(devices.companyId, user.companyId));
+      const ownedIds = new Set(owned.map((d) => d.id));
+      return sessions
+        .filter((s) => ownedIds.has(s.deviceId))
+        .map((s) => ({
+          deviceId: s.deviceId,
+          startedAt: s.startedAt,
+          watchers: s.watcherCount,
+        }));
+    }
+
+    return sessions.map((s) => ({
       deviceId: s.deviceId,
       startedAt: s.startedAt,
       watchers: s.watcherCount,
