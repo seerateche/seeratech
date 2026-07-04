@@ -25,13 +25,16 @@ FROM nginx:alpine
 # Copy built SPA assets
 COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
 
-# Copy nginx config (includes /healthz endpoint for Railway)
-COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+# Copy nginx TEMPLATE. At container start we substitute ${PORT} (Cloud Run
+# injects PORT=8080; local/other default to 80) then launch nginx. This is
+# required for Cloud Run, which routes traffic to the port it chooses.
+COPY apps/web/nginx.conf.template /etc/nginx/templates/default.conf.template
 
-EXPOSE 80
+# Default port when the platform does not inject one.
+ENV PORT=8080
+EXPOSE 8080
 
-# Railway healthcheck hits /healthz which nginx answers with 200 OK
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -qO- http://localhost/healthz || exit 1
-
-CMD ["nginx", "-g", "daemon off;"]
+# Render the template with the runtime $PORT, then run nginx in the foreground.
+# (nginx:alpine ships /docker-entrypoint.d scripts that run envsubst on
+# /etc/nginx/templates/*.template, but we do it explicitly to be port-safe.)
+CMD ["/bin/sh", "-c", "envsubst '${PORT}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]

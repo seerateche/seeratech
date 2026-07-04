@@ -52,17 +52,19 @@ ENV MIGRATIONS_DIR=/app/drizzle
 RUN mkdir -p /tmp/streams /tmp/uploads && chown -R node:node /tmp
 USER node
 
-EXPOSE 3001
+# Cloud Run injects PORT (default 8080) and routes traffic to it. main.ts
+# reads process.env.PORT, so we default it here and expose the same value.
+ENV PORT=8080
+EXPOSE 8080
 
-# NOTE: no Docker HEALTHCHECK here on purpose.
-# Railway performs its OWN external healthcheck (railway.json → healthcheckPath
-# = /api/v1/health) against the runtime $PORT it injects. A second internal
-# HEALTHCHECK on a hard-coded port can conflict and mark the deploy unhealthy.
+# NOTE: no Docker HEALTHCHECK here on purpose. Cloud Run performs its own
+# startup/liveness probe against the injected $PORT. A second internal
+# HEALTHCHECK on a hard-coded port can conflict.
 
 # Startup: run DB migrations + seed, THEN start the API — but use ";" (not "&&")
 # so the API ALWAYS boots even if migrations fail. This is critical: if the API
-# never starts, Railway's healthcheck fails and the container is killed before
-# any tables can be created. If migrate fails, the app still comes up and the
-# tables can be created on demand via POST /api/v1/auth/run-migrations.
-# The migrate step is also time-boxed so a hanging DB connection can't block boot.
+# never starts, the platform's startup probe fails and the container is killed
+# before any tables can be created. If migrate fails, the app still comes up and
+# the tables can be created on demand via POST /api/v1/auth/run-migrations.
+# The migrate step is time-boxed so a hanging DB connection can't block boot.
 CMD ["sh", "-c", "timeout 60 node dist/database/migrate.js ; node dist/main.js"]

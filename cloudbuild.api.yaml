@@ -1,0 +1,71 @@
+# ============================================================
+# SEERA PLATFORM v4 — Cloud Build → Cloud Run (API)
+# ============================================================
+# Builds apps/api Docker image and deploys it to Cloud Run.
+#
+# Manual run:
+#   gcloud builds submit --config cloudbuild.api.yaml \
+#     --substitutions=_REGION=europe-west1,_DB_URL_SECRET=DATABASE_URL
+#
+# Or connect this file to a Cloud Build TRIGGER on branch `main`
+# (see DEPLOY_GOOGLE_CLOUD.md).
+# ============================================================
+
+substitutions:
+  _SERVICE: seera-api          # Cloud Run service name
+  _REGION: europe-west1        # change to your region
+  _REPO: seera                 # Artifact Registry repo name
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+
+images:
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api:$COMMIT_SHA'
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api:latest'
+
+steps:
+  # 1) Build the API image (root context so the monorepo workspaces resolve)
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - apps/api/Dockerfile
+      - -t
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api:$COMMIT_SHA'
+      - -t
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api:latest'
+      - .
+
+  # 2) Push both tags
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - --all-tags
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api'
+
+  # 3) Deploy to Cloud Run.
+  #    Secrets (DATABASE_URL, JWT_*, ENCRYPTION_KEY, MIGRATION_SECRET,
+  #    SEED_SUPER_ADMIN_PASSWORD) are wired via --set-secrets so they are
+  #    NEVER baked into the image. Create them once in Secret Manager first
+  #    (see DEPLOY_GOOGLE_CLOUD.md).
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - '${_SERVICE}'
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api:$COMMIT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=8080
+      - --cpu=1
+      - --memory=512Mi
+      - --min-instances=0
+      - --max-instances=4
+      - --set-env-vars=NODE_ENV=production,ENABLE_SWAGGER=false
+      - --set-secrets=DATABASE_URL=DATABASE_URL:latest,JWT_SECRET=JWT_SECRET:latest,JWT_REFRESH_SECRET=JWT_REFRESH_SECRET:latest,ENCRYPTION_KEY=ENCRYPTION_KEY:latest,MIGRATION_SECRET=MIGRATION_SECRET:latest,SEED_SUPER_ADMIN_PASSWORD=SEED_SUPER_ADMIN_PASSWORD:latest

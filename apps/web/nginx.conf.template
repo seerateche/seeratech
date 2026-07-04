@@ -1,0 +1,37 @@
+# ============================================================
+# SEERA PLATFORM v4 - Web Nginx config (Cloud Run friendly)
+# ${PORT} is substituted at container start by envsubst.
+# Cloud Run injects PORT (default 8080); Railway/local default to 80.
+# ============================================================
+server {
+    listen ${PORT};
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Gzip
+    gzip on;
+    gzip_vary on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml image/svg+xml;
+
+    # Health check endpoint (Cloud Run / Railway)
+    location = /healthz {
+        access_log off;
+        add_header Content-Type text/plain;
+        return 200 "ok";
+    }
+
+    # SPA routing (React Router)
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Static asset caching
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # NOTE: no /api proxy — the SPA calls the API directly via VITE_API_BASE_URL
+    # (baked in at build time). On Cloud Run the API is a separate service.
+}
