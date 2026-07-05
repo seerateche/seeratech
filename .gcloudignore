@@ -1,0 +1,39 @@
+# ============================================================
+# Files NOT uploaded to Cloud Build (keeps uploads small & fast).
+# The Docker builds run `npm install` inside the image, so local
+# node_modules / build output are never needed in the build context.
+# ============================================================
+
+.git
+.gitignore
+.github
+
+# Dependencies (reinstalled inside the Docker build)
+node_modules/
+**/node_modules/
+
+# Build output (rebuilt inside Docker)
+dist/
+**/dist/
+apps/web/dist/
+apps/api/dist/
+packages/shared/dist/
+
+# Local env / secrets — must NEVER reach the build
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+*.log
+
+# Android / Capacitor native build artifacts
+apps/web/android/
+apps/web/ios/
+
+# Old platform configs (not used on Google Cloud)
+railway*.json
+Procfile

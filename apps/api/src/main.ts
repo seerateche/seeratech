@@ -8,6 +8,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import compression from 'compression';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { getCorsConfig, isOriginAllowed } from './common/cors-origin';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -48,31 +49,13 @@ async function bootstrap() {
   //  - Requests with no Origin header (curl, mobile apps, health checks,
   //    same-origin) are allowed.
   //  - Set CORS_ALLOW_ALL=true to allow every origin (use only for debugging).
-  const corsOrigins = config
-    .get<string>('CORS_ORIGINS', 'http://localhost:5173,http://localhost:3000')
-    .split(',')
-    .map((o) => o.trim())
-    .filter(Boolean);
-  const allowAll = config.get('CORS_ALLOW_ALL') === 'true';
+  const { origins: corsOrigins, allowAll } = getCorsConfig();
 
   app.enableCors({
     origin: (origin, callback) => {
-      // Non-browser clients (no Origin) and explicit allow-all.
-      if (!origin || allowAll) return callback(null, true);
-
-      const isListed = corsOrigins.includes(origin);
-      const isRailway = /\.(up\.)?railway\.app$/i.test(
-        (() => {
-          try {
-            return new URL(origin).hostname;
-          } catch {
-            return '';
-          }
-        })(),
-      );
-
-      if (isListed || isRailway) return callback(null, true);
-
+      if (isOriginAllowed(origin, corsOrigins, allowAll)) {
+        return callback(null, true);
+      }
       logger.warn(`🚫 CORS blocked origin: ${origin}`);
       return callback(null, false);
     },
