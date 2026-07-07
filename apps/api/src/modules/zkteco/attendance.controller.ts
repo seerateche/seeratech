@@ -85,7 +85,7 @@ export class AttendanceController {
     @CurrentUser() user: AuthTokenPayload,
     @Param('deviceId', ParseUUIDPipe) deviceId: string,
   ) {
-    const count = await this.zk.syncAttendanceLogs(deviceId, user.companyId ?? '', user);
+    const count = await this.zk.syncAttendanceLogs(deviceId, user.companyId ?? '');
     return { synced: count };
   }
 }
