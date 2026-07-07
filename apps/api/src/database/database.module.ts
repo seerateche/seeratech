@@ -5,7 +5,11 @@ import { Module, Global } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
+import * as dns from 'dns';
 import * as schema from './schema';
+
+// Force IPv4 DNS resolution — Cloud Run cannot reach Supabase over IPv6
+dns.setDefaultResultOrder('ipv4first');
 
 export const DRIZZLE_TOKEN = Symbol('DRIZZLE_TOKEN');
 
@@ -21,14 +25,14 @@ export type DrizzleDB = ReturnType<typeof drizzle<typeof schema>>;
         const databaseUrl = config.get<string>('DATABASE_URL');
         const dbSslConfig = config.get<string>('DB_SSL');
 
-        let sslEnabled = false;
+        let sslEnabled = true;
         if (dbSslConfig === 'false') {
           sslEnabled = false;
         } else if (dbSslConfig === 'true') {
           sslEnabled = true;
         } else {
-          // Default to false because Railway internal PG doesn't support SSL
-          sslEnabled = false;
+          // Default to true for Supabase / Cloud SQL compatibility
+          sslEnabled = true;
         }
 
         const ssl = sslEnabled ? { rejectUnauthorized: false } : false;
