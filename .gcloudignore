@@ -4,8 +4,11 @@
 # node_modules / build output are never needed in the build context.
 # ============================================================
 
+# IMPORTANT: Do NOT inherit .gitignore rules — we control everything here.
+# Without this line, gcloud may auto-inherit .gitignore and exclude files
+# that Docker needs (like package-lock.json in subdirectories).
+
 .git
-.gitignore
 .github
 
 # Dependencies (reinstalled inside the Docker build)
@@ -15,14 +18,11 @@ node_modules/
 # Build output (rebuilt inside Docker)
 dist/
 **/dist/
-apps/web/dist/
-apps/api/dist/
-packages/shared/dist/
 
 # Local env / secrets — must NEVER reach the build
 .env
-.env.*
-!.env.example
+.env.local
+.env.*.local
 
 # Editor / OS
 .vscode/
@@ -35,3 +35,6 @@ apps/web/android/
 apps/web/ios/
 android/
 ios/
+
+# Source map files (not needed in build)
+*.js.map

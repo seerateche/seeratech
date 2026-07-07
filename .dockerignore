@@ -1,0 +1,36 @@
+# Docker build context ignore file
+# Only ignore things that are truly not needed during `docker build`
+
+.git
+.github
+.vscode
+.idea
+
+# Local dependencies (Docker runs its own npm install)
+node_modules
+**/node_modules
+
+# Build output (Docker rebuilds everything)
+apps/api/dist
+apps/web/dist
+packages/shared/dist
+
+# Local env files
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+*.log
+
+# Android / iOS native builds
+android
+ios
+apps/web/android
+apps/web/ios
+
+# Docs (not needed in image)
+*.md
+!packages/shared/README.md
