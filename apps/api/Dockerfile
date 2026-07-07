@@ -6,20 +6,14 @@ RUN apk add --no-cache python3 make g++
 
 WORKDIR /app
 
-# 1) نسخ ملفات المشروع الأساسية فقط للبدء
-COPY package*.json ./
-COPY apps/api/package*.json ./apps/api/
-COPY apps/web/package*.json ./apps/web/
-COPY packages/shared/package*.json ./packages/shared/
+# Copy everything at once (avoid glob COPY issues in Cloud Build)
+COPY . .
 
-# 2) تنظيف وتثبيت نظيف تماماً بدون الاعتماد على أي ملفات محلية
+# Install dependencies
 RUN npm cache clean --force
 RUN npm install --legacy-peer-deps
 
-# 3) نسخ باقي كود المصدر
-COPY . .
-
-# 4) بناء المشروع
+# Build the project
 RUN npm run build --workspace=packages/shared
 RUN npm run build --workspace=apps/api
 
