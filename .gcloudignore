@@ -33,7 +33,5 @@ packages/shared/dist/
 # Android / Capacitor native build artifacts
 apps/web/android/
 apps/web/ios/
-
-# Old platform configs (not used on Google Cloud)
-railway*.json
-Procfile
+android/
+ios/
