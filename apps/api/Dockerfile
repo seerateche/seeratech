@@ -11,6 +11,7 @@ COPY . .
 
 # Install dependencies
 RUN npm cache clean --force
+RUN rm -f package-lock.json
 RUN npm install --legacy-peer-deps
 
 # Build the project
