@@ -68,6 +68,25 @@ export class BillingService {
     });
   }
 
+  async createQuotation(companyId: string, data: any) {
+    // Generate a simple quotation number (e.g., Q-12345)
+    const quoteNum = `Q-${Math.floor(10000 + Math.random() * 90000)}`;
+    const totalAmount = data.items.reduce((sum: number, item: any) => sum + (item.quantity * item.unitPrice), 0);
+
+    const [newQuote] = await this.db.insert(quotations).values({
+      companyId,
+      quotationNumber: quoteNum,
+      customerName: data.customerName,
+      customerPhone: data.customerPhone,
+      totalAmount,
+      items: data.items,
+      notes: data.notes,
+      validUntil: data.validUntil ? new Date(data.validUntil) : null,
+    }).returning();
+
+    return newQuote;
+  }
+
   async getExpenses(companyId: string) {
     return this.db.query.expenses.findMany({
       where: eq(expenses.companyId, companyId),

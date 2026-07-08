@@ -1,5 +1,6 @@
-import { Controller, Get, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Request } from '@nestjs/common';
 import { BillingService } from './billing.service';
+import { CreateQuotationDto } from './billing.dto';
 import { JwtAuthGuard } from '../auth/auth.service';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
@@ -26,6 +27,12 @@ export class BillingController {
   @ApiOperation({ summary: 'Get all quotations' })
   getQuotations(@Request() req: any) {
     return this.billingService.getQuotations(req.user.companyId);
+  }
+
+  @Post('quotations')
+  @ApiOperation({ summary: 'Create a new quotation' })
+  createQuotation(@Request() req: any, @Body() data: CreateQuotationDto) {
+    return this.billingService.createQuotation(req.user.companyId, data);
   }
 
   @Get('expenses')
