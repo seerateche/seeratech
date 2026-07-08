@@ -32,8 +32,8 @@ export class CreateIspAccountBody {
   accountName: string;
 
   @IsString()
-  @Matches(/^0[23]\d{8}$/, {
-    message: 'رقم الهاتف يجب أن يكون 10 أرقام يبدأ بـ 02 أو 03 (مثال: 035XXXXXXX)',
+  @Matches(/^0[2-9]\d{7,8}$/, {
+    message: 'يجب أن يكون رقم التليفون الأرضي 9 أو 10 أرقام شاملاً كود المحافظة',
   })
   phoneNumber: string;
 

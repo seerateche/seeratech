@@ -60,8 +60,8 @@ const AccountModal: React.FC<ModalProps> = ({
     const e: Partial<AccountForm> = {};
     if (!form.accountName.trim())         e.accountName  = 'اسم الحساب مطلوب';
     if (mode === 'add' || form.password) {
-      if (form.phoneNumber && !/^0[23]\d{8}$/.test(form.phoneNumber.replace(/\s/g, ''))) {
-        e.phoneNumber = 'مثال صحيح: 035XXXXXXX أو 023XXXXXXX';
+      if (form.phoneNumber && !/^0[2-9]\d{7,8}$/.test(form.phoneNumber.replace(/\s/g, ''))) {
+        e.phoneNumber = 'يجب أن يكون رقم التليفون الأرضي 9 أو 10 أرقام شاملاً كود المحافظة';
       }
       if (!form.phoneNumber)              e.phoneNumber  = 'رقم الهاتف مطلوب';
       if (!form.password && mode === 'add') e.password   = 'كلمة المرور مطلوبة';
