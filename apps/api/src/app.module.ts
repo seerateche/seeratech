@@ -20,6 +20,7 @@ import { CctvModule } from './modules/cctv/cctv.module';
 import { TerminalModule } from './modules/terminal/terminal.module';
 import { IspTrackingModule } from './modules/isp-tracking/isp-tracking.module';
 import { HealthModule } from './modules/health/health.module';
+import { BillingModule } from './modules/billing/billing.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { HealthModule } from './modules/health/health.module';
     CctvModule,
     TerminalModule,
     IspTrackingModule,
+    BillingModule,
   ],
   providers: [
     {

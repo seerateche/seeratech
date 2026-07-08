@@ -7,7 +7,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Router, Ticket, Camera,
   Shield, ChevronLeft, ChevronRight, Bell, LogOut,
-  Activity, Wifi, Crown, Menu, X, Fingerprint, Globe, KeyRound
+  Activity, Wifi, Crown, Menu, X, Fingerprint, Globe, KeyRound, Wallet
 } from 'lucide-react';
 import { useAuthStore, useIsSuperAdmin } from '../../stores/auth.store';
 import { UserRole } from '@sira/shared';
@@ -30,6 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'بطاقات الإنترنت',  labelShort: 'البطاقات', icon: Ticket,           to: '/vouchers' },
   { label: 'كاميرات المراقبة', labelShort: 'CCTV',     icon: Camera,           to: '/cctv' },
   { label: 'البصمة والحضور',   labelShort: 'الحضور',   icon: Fingerprint,      to: '/attendance' },
+  { label: 'الحسابات والفواتير',labelShort: 'الحسابات', icon: Wallet,          to: '/billing' },
   { label: 'كوتا الإنترنت',    labelShort: 'الكوتا',   icon: Globe,            to: '/isp-quota' },
 ];
 

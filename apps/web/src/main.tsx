@@ -26,6 +26,10 @@ import { VouchersPage }     from './pages/devices/VouchersPage';
 import { AttendancePage }   from './pages/devices/AttendancePage';
 import { CctvPage }         from './pages/devices/CctvPage';
 import { IspQuotaView }     from './pages/isp/IspQuotaView';
+import { BillingDashboard } from './pages/billing/BillingDashboard';
+import { InvoicesPage }     from './pages/billing/InvoicesPage';
+import { QuotationsPage }   from './pages/billing/QuotationsPage';
+import { ExpensesPage }     from './pages/billing/ExpensesPage';
 import { AuthGuard }        from './components/auth/AuthGuard';
 import { UserRole }         from '@sira/shared';
 
@@ -99,6 +103,11 @@ const router = createHashRouter([
       { path: 'attendance',                 element: <AttendancePage /> },
       { path: 'cctv',                       element: <CctvPage /> },
       { path: 'isp-quota',                  element: <IspQuotaView /> },
+      { path: 'billing',                    element: <BillingDashboard /> },
+      { path: 'billing/invoices',           element: <InvoicesPage /> },
+      { path: 'billing/quotations',         element: <QuotationsPage /> },
+      { path: 'billing/expenses',           element: <ExpensesPage /> },
+      { path: '*',                          element: <Navigate to="/dashboard" replace /> },
     ],
   },
   { path: '*', element: <Navigate to="/login" replace /> },

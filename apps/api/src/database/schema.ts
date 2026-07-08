@@ -63,6 +63,32 @@ export const attendanceEventEnum = pgEnum('attendance_event_type', [
   'overtime_out',
 ]);
 
+export const invoiceStatusEnum = pgEnum('invoice_status', [
+  'unpaid',
+  'paid',
+  'overdue',
+  'cancelled',
+]);
+
+export const quotationStatusEnum = pgEnum('quotation_status', [
+  'draft',
+  'sent',
+  'accepted',
+  'rejected',
+]);
+
+export const transactionTypeEnum = pgEnum('transaction_type', [
+  'income',
+  'expense',
+]);
+
+export const paymentMethodEnum = pgEnum('payment_method', [
+  'cash',
+  'bank_transfer',
+  'vodafone_cash',
+  'credit',
+]);
+
 // ── Companies (Multi-tenant root) ─────────────────────────────
 
 export const companies = pgTable(
@@ -562,3 +588,149 @@ export type AttendanceLog = typeof attendanceLogs.$inferSelect;
 export type NewAttendanceLog = typeof attendanceLogs.$inferInsert;
 export type TerminalSession = typeof terminalSessions.$inferSelect;
 export type AuditLog = typeof auditLogs.$inferSelect;
+
+// ── Billing & Accounting ─────────────────────────────────────
+
+export const invoices = pgTable(
+  'invoices',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    companyId: uuid('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
+    invoiceNumber: varchar('invoice_number', { length: 50 }).notNull(),
+    customerId: uuid('customer_id'), // Can reference users/subscribers if needed
+    customerName: varchar('customer_name', { length: 255 }).notNull(),
+    customerPhone: varchar('customer_phone', { length: 50 }),
+    amount: integer('amount').notNull(), // stored in cents/piasters or just integer
+    status: invoiceStatusEnum('status').notNull().default('unpaid'),
+    dueDate: timestamp('due_date', { withTimezone: true }),
+    paidAt: timestamp('paid_at', { withTimezone: true }),
+    notes: text('notes'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    companyIdx: index('invoices_company_idx').on(t.companyId),
+    statusIdx: index('invoices_status_idx').on(t.status),
+  })
+);
+
+export const quotations = pgTable(
+  'quotations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    companyId: uuid('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
+    quotationNumber: varchar('quotation_number', { length: 50 }).notNull(),
+    customerName: varchar('customer_name', { length: 255 }).notNull(),
+    customerPhone: varchar('customer_phone', { length: 50 }),
+    totalAmount: integer('total_amount').notNull(),
+    status: quotationStatusEnum('status').notNull().default('draft'),
+    validUntil: timestamp('valid_until', { withTimezone: true }),
+    items: jsonb('items').notNull().default('[]'),
+    notes: text('notes'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    companyIdx: index('quotations_company_idx').on(t.companyId),
+  })
+);
+
+export const expenses = pgTable(
+  'expenses',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    companyId: uuid('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
+    category: varchar('category', { length: 100 }).notNull(),
+    amount: integer('amount').notNull(),
+    description: text('description').notNull(),
+    expenseDate: timestamp('expense_date', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    companyIdx: index('expenses_company_idx').on(t.companyId),
+    dateIdx: index('expenses_date_idx').on(t.expenseDate),
+  })
+);
+
+export const transactions = pgTable(
+  'transactions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    companyId: uuid('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
+    type: transactionTypeEnum('type').notNull(),
+    amount: integer('amount').notNull(),
+    paymentMethod: paymentMethodEnum('payment_method').notNull().default('cash'),
+    referenceId: uuid('reference_id'), // Can refer to Invoice ID or Expense ID
+    notes: text('notes'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    companyIdx: index('transactions_company_idx').on(t.companyId),
+  })
+);
+
+export const vodafoneCashTransfers = pgTable(
+  'vodafone_cash_transfers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    companyId: uuid('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
+    walletNumber: varchar('wallet_number', { length: 50 }).notNull(),
+    senderNumber: varchar('sender_number', { length: 50 }),
+    amount: integer('amount').notNull(),
+    referenceId: uuid('reference_id'), // E.g., Invoice ID
+    notes: text('notes'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    companyIdx: index('vfcash_company_idx').on(t.companyId),
+  })
+);
+
+// ── Billing Relations ────────────────────────────────────────
+
+export const invoiceRelations = relations(invoices, ({ one }) => ({
+  company: one(companies, {
+    fields: [invoices.companyId],
+    references: [companies.id],
+  }),
+}));
+
+export const quotationRelations = relations(quotations, ({ one }) => ({
+  company: one(companies, {
+    fields: [quotations.companyId],
+    references: [companies.id],
+  }),
+}));
+
+export const expenseRelations = relations(expenses, ({ one }) => ({
+  company: one(companies, {
+    fields: [expenses.companyId],
+    references: [companies.id],
+  }),
+}));
+
+export const transactionRelations = relations(transactions, ({ one }) => ({
+  company: one(companies, {
+    fields: [transactions.companyId],
+    references: [companies.id],
+  }),
+}));
+
+export const vodafoneCashRelations = relations(vodafoneCashTransfers, ({ one }) => ({
+  company: one(companies, {
+    fields: [vodafoneCashTransfers.companyId],
+    references: [companies.id],
+  }),
+}));
+
+export type Invoice = typeof invoices.$inferSelect;
+export type NewInvoice = typeof invoices.$inferInsert;
+export type Quotation = typeof quotations.$inferSelect;
+export type NewQuotation = typeof quotations.$inferInsert;
+export type Expense = typeof expenses.$inferSelect;
+export type NewExpense = typeof expenses.$inferInsert;
+export type Transaction = typeof transactions.$inferSelect;
+export type NewTransaction = typeof transactions.$inferInsert;
+export type VodafoneCashTransfer = typeof vodafoneCashTransfers.$inferSelect;
+export type NewVodafoneCashTransfer = typeof vodafoneCashTransfers.$inferInsert;
