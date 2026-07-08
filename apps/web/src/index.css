@@ -106,10 +106,10 @@
 
   /* ── Cards ── */
   .card {
-    @apply bg-surface-1/80 border border-surface-2/50 rounded-xl shadow-card backdrop-blur-md;
+    @apply bg-surface-1/40 border border-white/10 rounded-xl shadow-card backdrop-blur-xl;
   }
   .card-header {
-    @apply px-4 py-3 border-b border-surface-2 flex items-center justify-between flex-wrap gap-2;
+    @apply px-4 py-3 border-b border-white/5 flex items-center justify-between flex-wrap gap-2;
   }
   .card-body { @apply p-4; }
 
