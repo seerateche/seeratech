@@ -61,7 +61,7 @@ async function bootstrap() {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Authorization', 'Content-Type', 'X-Company-Slug'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'X-Company-Slug', 'x-company-id'],
   });
   logger.log(
     `🌐 CORS allow-list: ${corsOrigins.join(', ') || '(none)'}${

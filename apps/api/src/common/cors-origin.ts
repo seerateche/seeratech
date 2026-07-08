@@ -44,7 +44,7 @@ export function isOriginAllowed(
   } catch {
     hostname = '';
   }
-  return /\.(up\.)?railway\.app$/i.test(hostname);
+  return /\.(up\.)?railway\.app$/i.test(hostname) || /\.run\.app$/i.test(hostname);
 }
 
 /**
