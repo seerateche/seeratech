@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Plus, Trash2, Calendar } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiPost } from '../../../utils/api';
+import { apiPost } from '../../utils/api';
 import toast from 'react-hot-toast';
 
 interface Props {

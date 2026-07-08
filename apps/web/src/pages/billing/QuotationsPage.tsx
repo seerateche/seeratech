@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { FileSpreadsheet, Plus, FileText, CheckCircle2, Clock } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { apiGet } from '../../../utils/api';
+import { apiGet } from '../../utils/api';
 import { AddQuotationModal } from './AddQuotationModal';
 
 export const QuotationsPage: React.FC = () => {
