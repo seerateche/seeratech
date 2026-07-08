@@ -1,6 +1,6 @@
 import { Controller, Get, UseGuards, Request } from '@nestjs/common';
 import { BillingService } from './billing.service';
-import { JwtAuthGuard } from '../../security/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/auth.service';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 @ApiTags('Billing')
