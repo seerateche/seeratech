@@ -62,6 +62,7 @@ export class MikroTikService implements OnModuleDestroy {
   /** In-flight connection promises — prevents a thundering-herd race
    *  where concurrent callers each open a separate socket for one device. */
   private readonly connecting = new Map<string, Promise<RouterOSAPI>>();
+  private readonly interfaceCache = new Map<string, string>();
 
   // Connection tuning.
   private readonly CONNECT_TIMEOUT = 10;          // seconds (RouterOSAPI)
@@ -117,6 +118,10 @@ export class MikroTikService implements OnModuleDestroy {
   ): Promise<RouterOSAPI> {
     const pooled = this.connectionPool.get(deviceId);
     if (pooled) {
+      if (Date.now() - pooled.lastUsed < 15000) {
+        pooled.lastUsed = Date.now();
+        return pooled.api;
+      }
       try {
         await pooled.api.write('/system/identity/print');
         pooled.lastUsed = Date.now();
@@ -1236,20 +1241,24 @@ export class MikroTikService implements OnModuleDestroy {
     const timestamp = new Date().toISOString();
     try {
       const api = await this.getConnection(deviceId, device);
-      const [resources, pppoeActive, hotspotActive, interfaces] = await Promise.all([
+      let target = this.interfaceCache.get(deviceId);
+      
+      const [resources, pppoeActive, hotspotActive] = await Promise.all([
         api.write('/system/resource/print'),
-        api.write('/ppp/active/print').catch(() => []),
-        api.write('/ip/hotspot/active/print').catch(() => []),
-        api.write('/interface/print').catch(() => []),
+        api.write('/ppp/active/print', ['=.proplist=.id']).catch(() => []),
+        api.write('/ip/hotspot/active/print', ['=.proplist=.id']).catch(() => []),
       ]);
       const res = (resources[0] || {}) as any;
       const totalMemory = this.toInt(res['total-memory']);
       const freeMemory = this.toInt(res['free-memory']);
       const usedMemory = totalMemory - freeMemory;
 
-      // Pick the first running interface for the bandwidth sample.
-      const running = (interfaces as any[]).find((i) => i['running'] === 'true');
-      const target = running ? running['name'] : (interfaces as any[])[0]?.['name'];
+      if (!target) {
+        const interfaces = await api.write('/interface/print', ['=.proplist=name,running']).catch(() => []);
+        const running = (interfaces as any[]).find((i) => i['running'] === 'true');
+        target = running ? running['name'] : (interfaces as any[])[0]?.['name'];
+        if (target) this.interfaceCache.set(deviceId, target);
+      }
 
       let rxBits = 0;
       let txBits = 0;

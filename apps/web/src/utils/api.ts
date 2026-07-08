@@ -18,6 +18,8 @@ const API_BASE_URL = ENV_BASE
   ? `${ENV_BASE.replace(/\/$/, '')}/api/v1`
   : '/api/v1';
 
+export const SOCKET_URL = ENV_BASE ? ENV_BASE.replace(/\/$/, '') : '';
+
 if (isNativeApp && !ENV_BASE && typeof console !== 'undefined') {
   console.warn(
     '[Seera] Running as native app but VITE_API_BASE_URL is not set. ' +

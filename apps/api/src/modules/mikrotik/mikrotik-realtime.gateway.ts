@@ -105,11 +105,11 @@ export class MikroTikRealtimeGateway
   }
 
   /**
-   * Every 30s, push a realtime snapshot for every active MikroTik device to
+   * Every 5s, push a realtime snapshot for every active MikroTik device to
    * its owning company room (and super-admins). Reentrancy-guarded so a slow
    * cycle never overlaps the next tick.
    */
-  @Interval(30_000)
+  @Interval(5_000)
   async broadcastSnapshots(): Promise<void> {
     if (this.broadcasting || !this.server) return;
     this.broadcasting = true;
@@ -117,6 +117,8 @@ export class MikroTikRealtimeGateway
       const targets = await this.mikrotik.getActiveMikrotikDeviceIds();
       for (const { id, companyId } of targets) {
         // Skip devices nobody is listening to (saves router round-trips).
+        if (!this.hasActiveSubscribers(id)) continue;
+
         const room = this.server.to(`company:${companyId}`).to('super_admin');
         try {
           const snapshot = await this.mikrotik.getRealtimeSnapshot(id);
@@ -128,5 +130,12 @@ export class MikroTikRealtimeGateway
     } finally {
       this.broadcasting = false;
     }
+  }
+
+  private hasActiveSubscribers(deviceId: string): boolean {
+    for (const subs of this.subscriptions.values()) {
+      if (subs.has(deviceId)) return true;
+    }
+    return false;
   }
 }

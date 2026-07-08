@@ -7,11 +7,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Router, Cpu, HardDrive, Clock, Users, Wifi, WifiOff,
   Upload, RefreshCw, Zap, Shield, ChevronRight, X,
-  Server, Globe, Activity, MemoryStick,
+  Server, Globe, Activity, MemoryStick, ActivitySquare,
 } from 'lucide-react';
-import { apiGet, apiPost, api } from '../../utils/api';
-import { MikroTikStats, HotspotActiveUser, HotspotProfile } from '@sira/shared';
+import { apiGet, apiPost, api, SOCKET_URL } from '../../utils/api';
+import { MikroTikStats, HotspotActiveUser, HotspotProfile, MikroTikRealtimeSnapshot } from '@sira/shared';
 import toast from 'react-hot-toast';
+import { useEffect } from 'react';
+import { io } from 'socket.io-client';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const ProgressBar: React.FC<{ value: number; max: number; color?: string }> = ({
   value, max, color = '#6366f1',
@@ -42,10 +45,46 @@ export const MikroTikPage: React.FC = () => {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [templateName, setTemplateName] = useState('');
 
+  const [liveData, setLiveData] = useState<MikroTikRealtimeSnapshot | null>(null);
+  const [trafficHistory, setTrafficHistory] = useState<any[]>([]);
+
+  // Connect WebSocket
+  useEffect(() => {
+    if (!deviceId) return;
+    const raw = localStorage.getItem('sira-auth');
+    const token = raw ? JSON.parse(raw)?.state?.accessToken : null;
+    if (!token) return;
+
+    const socket = io(`${SOCKET_URL}/ws/mikrotik`, {
+      auth: { token },
+      transports: ['websocket'],
+    });
+
+    socket.on('connect', () => {
+      socket.emit('mikrotik:subscribe', { deviceIds: [deviceId] });
+    });
+
+    socket.on('mikrotik:realtime', (data: MikroTikRealtimeSnapshot) => {
+      if (data.deviceId === deviceId) {
+        setLiveData(data);
+        setTrafficHistory(prev => {
+          const rxMb = Number((data.rxBitsPerSecond / 1_000_000).toFixed(2));
+          const txMb = Number((data.txBitsPerSecond / 1_000_000).toFixed(2));
+          const time = new Date(data.timestamp).toLocaleTimeString('ar-EG', { minute: '2-digit', second: '2-digit' });
+          const next = [...prev, { time, rx: rxMb, tx: txMb }];
+          if (next.length > 20) next.shift(); // Keep last 20 points
+          return next;
+        });
+      }
+    });
+
+    return () => { socket.disconnect(); };
+  }, [deviceId]);
+
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery<MikroTikStats>({
     queryKey: ['mikrotik', 'stats', deviceId],
     queryFn: () => apiGet(`/mikrotik/${deviceId}/stats`),
-    refetchInterval: 15_000,
+    refetchInterval: false, // Replaced by WebSockets
     enabled: !!deviceId,
   });
 
@@ -99,8 +138,16 @@ export const MikroTikPage: React.FC = () => {
     { id: 'template', label: 'قالب الهوتسبوت' },
   ] as const;
 
-  const memPct = stats ? (stats.memoryUsed / stats.memoryTotal) * 100 : 0;
+  const currentCpu = liveData ? liveData.cpuLoad : (stats?.cpuLoad || 0);
+  const memPct = liveData 
+    ? (liveData.memoryUsed / liveData.memoryTotal) * 100 
+    : (stats ? (stats.memoryUsed / stats.memoryTotal) * 100 : 0);
+  const memUsed = liveData ? liveData.memoryUsed : (stats?.memoryUsed || 0);
+  const memTotal = liveData ? liveData.memoryTotal : (stats?.memoryTotal || 0);
+  
   const hddPct = stats ? (stats.hddUsed / stats.hddTotal) * 100 : 0;
+  const activeHotspotUsers = liveData ? liveData.activeHotspot : (stats?.activeHotspotUsers || 0);
+  const uptime = liveData ? liveData.uptime : (stats?.uptime || '');
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -123,12 +170,12 @@ export const MikroTikPage: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { icon: Server, label: 'الجهاز', value: stats.boardName, sub: `v${stats.version}`, color: 'sira' },
-            { icon: Cpu, label: 'المعالج', value: `${stats.cpuLoad}%`, sub: 'CPU Load',
-              color: stats.cpuLoad > 80 ? 'red' : stats.cpuLoad > 60 ? 'amber' : 'green' },
-            { icon: MemoryStick, label: 'الذاكرة', value: `${((stats.memoryUsed / stats.memoryTotal) * 100).toFixed(0)}%`,
-              sub: `${formatBytes(stats.memoryUsed)} / ${formatBytes(stats.memoryTotal)}`,
+            { icon: Cpu, label: 'المعالج (Live)', value: `${currentCpu}%`, sub: 'CPU Load',
+              color: currentCpu > 80 ? 'red' : currentCpu > 60 ? 'amber' : 'green' },
+            { icon: MemoryStick, label: 'الذاكرة (Live)', value: `${memPct.toFixed(0)}%`,
+              sub: `${formatBytes(memUsed)} / ${formatBytes(memTotal)}`,
               color: memPct > 85 ? 'red' : 'blue' },
-            { icon: Users, label: 'مستخدمو الهوتسبوت', value: stats.activeHotspotUsers, sub: 'نشطون', color: 'green' },
+            { icon: Users, label: 'مستخدمو الهوتسبوت', value: activeHotspotUsers, sub: 'نشطون', color: 'green' },
           ].map((s) => (
             <div key={s.label} className="card p-4">
               <div className="flex items-center gap-2 mb-2">
@@ -173,20 +220,20 @@ export const MikroTikPage: React.FC = () => {
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-slate-400">استخدام المعالج</span>
-                      <span className="font-mono text-slate-200">{stats.cpuLoad}%</span>
+                      <span className="font-mono text-slate-200">{currentCpu}%</span>
                     </div>
-                    <ProgressBar value={stats.cpuLoad} max={100}
-                      color={stats.cpuLoad > 80 ? '#ef4444' : stats.cpuLoad > 60 ? '#f59e0b' : '#22c55e'} />
+                    <ProgressBar value={currentCpu} max={100}
+                      color={currentCpu > 80 ? '#ef4444' : currentCpu > 60 ? '#f59e0b' : '#22c55e'} />
                   </div>
                   {/* RAM */}
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-slate-400">الذاكرة العشوائية</span>
                       <span className="font-mono text-slate-200">
-                        {formatBytes(stats.memoryUsed)} / {formatBytes(stats.memoryTotal)}
+                        {formatBytes(memUsed)} / {formatBytes(memTotal)}
                       </span>
                     </div>
-                    <ProgressBar value={stats.memoryUsed} max={stats.memoryTotal}
+                    <ProgressBar value={memUsed} max={memTotal}
                       color={memPct > 85 ? '#ef4444' : '#6366f1'} />
                   </div>
                   {/* Storage */}
@@ -205,8 +252,49 @@ export const MikroTikPage: React.FC = () => {
                     <Clock className="w-5 h-5 text-sira-400" />
                     <div>
                       <p className="text-xs text-slate-500">وقت التشغيل</p>
-                      <p className="font-mono text-sm text-slate-200">{stats.uptime}</p>
+                      <p className="font-mono text-sm text-slate-200">{uptime}</p>
                     </div>
+                  </div>
+                </div>
+                
+                {/* Live Traffic Chart */}
+                <div className="pt-4 border-t border-surface-2">
+                  <div className="flex items-center gap-2 mb-4">
+                    <ActivitySquare className="w-4 h-4 text-sira-400" />
+                    <p className="text-sm font-semibold text-slate-300">مراقبة الترافيك (Live Traffic)</p>
+                  </div>
+                  <div className="h-64 bg-surface rounded-xl border border-surface-2 p-4">
+                    {trafficHistory.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={trafficHistory} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="colorRx" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                              <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                            </linearGradient>
+                            <linearGradient id="colorTx" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                              <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                          <XAxis dataKey="time" stroke="#64748b" fontSize={12} tickMargin={10} />
+                          <YAxis stroke="#64748b" fontSize={12} tickFormatter={(val) => `${val}M`} />
+                          <Tooltip 
+                            contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '8px' }}
+                            itemStyle={{ color: '#e2e8f0' }}
+                            formatter={(value: number) => [`${value} Mbps`, '']}
+                          />
+                          <Area type="monotone" dataKey="rx" name="التحميل (Rx)" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorRx)" />
+                          <Area type="monotone" dataKey="tx" name="الرفع (Tx)" stroke="#6366f1" strokeWidth={2} fillOpacity={1} fill="url(#colorTx)" />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center text-slate-500">
+                        <Zap className="w-8 h-8 mb-2 opacity-50" />
+                        <p className="text-sm">جاري جلب البيانات الحية...</p>
+                      </div>
+                    )}
                   </div>
                 </div>
                 {/* Device info */}
