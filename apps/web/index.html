@@ -39,7 +39,6 @@
     <!-- Prevent blank white flash before React mounts -->
     <style>
       html, body, #root {
-        background-color: #0f172a;
         min-height: 100%;
         margin: 0; padding: 0;
       }
@@ -59,7 +58,7 @@
       @keyframes spin { to { transform: translate(-50%,-50%) rotate(360deg); } }
     </style>
   </head>
-  <body class="bg-surface text-slate-100 antialiased overflow-x-hidden">
+  <body class="text-slate-100 antialiased overflow-x-hidden">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
