@@ -65,9 +65,9 @@ export class IspTrackingService {
   ): Promise<IspAccountPublic> {
     // Validate phone format — Egyptian landline 0X5XXXXXXX or 0X3XXXXXXX
     const phone = dto.phoneNumber.replace(/\s|-/g, '');
-    if (!/^0[23]\d{8}$/.test(phone)) {
+    if (!/^0[2-9]\d{7,8}$/.test(phone)) {
       throw new BadRequestException(
-        'صيغة رقم الهاتف غير صحيحة — يجب أن يكون 10 أرقام يبدأ بـ 02 أو 03',
+        'صيغة رقم الهاتف غير صحيحة — يجب أن يكون 9 أو 10 أرقام شاملاً كود المحافظة',
       );
     }
 
