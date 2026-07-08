@@ -47,6 +47,9 @@
     padding-top: var(--safe-top);
     padding-bottom: var(--safe-bottom);
     
+    /* Text Shadow to make text super clear over bright backgrounds */
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+
     /* Global Background Setup */
     background: linear-gradient(to bottom, rgba(15, 23, 42, 0.20), rgba(15, 23, 42, 0.40)), url('/bg.jpg?v=2');
     background-size: cover;
@@ -106,7 +109,7 @@
 
   /* ── Cards ── */
   .card {
-    @apply bg-surface-1/40 border border-white/10 rounded-xl shadow-card backdrop-blur-xl;
+    @apply bg-surface-1/30 border border-white/10 rounded-xl shadow-card backdrop-blur-2xl;
   }
   .card-header {
     @apply px-4 py-3 border-b border-white/5 flex items-center justify-between flex-wrap gap-2;
