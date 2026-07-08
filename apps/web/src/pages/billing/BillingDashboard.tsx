@@ -1,7 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Wallet, TrendingUp, TrendingDown, SmartphoneNfc, FileText, FileSpreadsheet } from 'lucide-react';
-import { apiGet } from '../../../utils/api';
+import { apiGet } from '../../utils/api';
 import { Link } from 'react-router-dom';
 
 export const BillingDashboard: React.FC = () => {
