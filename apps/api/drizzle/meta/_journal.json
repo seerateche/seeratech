@@ -15,6 +15,13 @@
       "when": 1780185804227,
       "tag": "0002_isp_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1783548500000,
+      "tag": "0003_billing_accounting",
+      "breakpoints": true
     }
   ]
 }
