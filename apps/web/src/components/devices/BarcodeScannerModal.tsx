@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Html5QrcodeScanner, Html5QrcodeScanType } from 'html5-qrcode';
-import { X, Camera } from 'lucide-react';
+import { Html5Qrcode } from 'html5-qrcode';
+import { X, Camera, AlertCircle } from 'lucide-react';
 
 interface BarcodeScannerModalProps {
   onScan: (decodedText: string) => void;
@@ -8,51 +8,50 @@ interface BarcodeScannerModalProps {
 }
 
 export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({ onScan, onClose }) => {
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isStarting, setIsStarting] = useState(true);
 
   useEffect(() => {
-    // Initialize the scanner
-    scannerRef.current = new Html5QrcodeScanner(
-      'barcode-reader',
+    // Initialize the core scanner
+    const html5QrCode = new Html5Qrcode("barcode-reader");
+    scannerRef.current = html5QrCode;
+
+    html5QrCode.start(
+      { facingMode: "environment" }, // Prefer back camera
       {
         fps: 10,
         qrbox: { width: 250, height: 250 },
         aspectRatio: 1.0,
-        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
-        rememberLastUsedCamera: true,
       },
-      false
-    );
-
-    const onScanSuccess = (decodedText: string) => {
-      // Stop scanner automatically after successful scan
-      scannerRef.current?.clear().then(() => {
-        onScan(decodedText);
-      }).catch(err => {
-        console.error('Failed to clear scanner', err);
-        onScan(decodedText);
-      });
-    };
-
-    const onScanFailure = (errorMessage: string) => {
-      // Usually called constantly as it tries to scan, we only care about success
-      // console.warn(errorMessage);
-    };
-
-    try {
-      scannerRef.current.render(onScanSuccess, onScanFailure);
-    } catch (err: any) {
-      setError(err?.message || 'Failed to initialize camera');
-    }
+      (decodedText) => {
+        // Success callback
+        html5QrCode.stop().then(() => {
+          onScan(decodedText);
+        }).catch(() => {
+          onScan(decodedText);
+        });
+      },
+      (errorMessage) => {
+        // Ignore continuous frame errors
+      }
+    ).then(() => {
+      setIsStarting(false);
+    }).catch((err: any) => {
+      setIsStarting(false);
+      setError('يرجى السماح للمتصفح باستخدام الكاميرا أو التأكد من عدم استخدامها في تطبيق آخر.');
+      console.error("Camera start error:", err);
+    });
 
     return () => {
-      scannerRef.current?.clear().catch(console.error);
+      if (scannerRef.current && scannerRef.current.isScanning) {
+        scannerRef.current.stop().catch(console.error);
+      }
     };
   }, [onScan]);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm">
       <div className="w-full max-w-md bg-surface border border-surface-2 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-surface-2 bg-surface-1/50">
@@ -69,20 +68,30 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({ onScan
         </div>
 
         {/* Scanner Container */}
-        <div className="p-4 bg-surface flex-1 flex flex-col items-center">
-          {error && (
-            <div className="w-full p-3 mb-4 bg-red-900/50 border border-red-500/50 rounded-lg text-red-200 text-sm text-center">
-              {error}
+        <div className="p-4 bg-surface flex-1 flex flex-col items-center justify-center min-h-[350px]">
+          {error ? (
+            <div className="w-full p-4 bg-red-900/20 border border-red-500/30 rounded-xl flex flex-col items-center text-center gap-3">
+              <AlertCircle className="w-8 h-8 text-red-400" />
+              <p className="text-red-200 text-sm">{error}</p>
+              <button onClick={onClose} className="btn-secondary btn-sm mt-2">إغلاق</button>
             </div>
+          ) : (
+            <>
+              {isStarting && (
+                <div className="absolute flex flex-col items-center justify-center text-sira-400 gap-2">
+                  <div className="w-8 h-8 border-4 border-sira-500/30 border-t-sira-400 rounded-full animate-spin" />
+                  <span className="text-sm">جاري تشغيل الكاميرا...</span>
+                </div>
+              )}
+              <div className={`w-full max-w-[300px] overflow-hidden rounded-xl border-2 ${isStarting ? 'border-transparent' : 'border-dashed border-sira-500'} bg-black relative z-10`}>
+                <div id="barcode-reader" className="w-full h-full min-h-[250px]"></div>
+              </div>
+              
+              <p className="mt-6 text-sm text-slate-400 text-center leading-relaxed">
+                قم بتوجيه الكاميرا نحو الـ QR Code أو الباركود الموجود على الجهاز ليتم قراءته تلقائياً.
+              </p>
+            </>
           )}
-          
-          <div className="w-full max-w-[300px] overflow-hidden rounded-xl border-2 border-dashed border-sira-500/50 bg-black">
-            <div id="barcode-reader" className="w-full"></div>
-          </div>
-          
-          <p className="mt-6 text-sm text-slate-400 text-center leading-relaxed">
-            قم بتوجيه الكاميرا نحو الـ QR Code أو الباركود الموجود على الجهاز ليتم قراءته تلقائياً.
-          </p>
         </div>
       </div>
     </div>
