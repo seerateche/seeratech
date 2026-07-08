@@ -7,11 +7,12 @@ import { Link } from 'react-router-dom';
 import {
   Router, Plus, Wifi, WifiOff, RefreshCw, Settings,
   Cpu, HardDrive, Activity, Edit2, Trash2, ChevronRight,
-  Lock, Globe, ShieldCheck, Fingerprint, Camera,
+  Lock, Globe, ShieldCheck, Fingerprint, Camera, ScanBarcode, QrCode
 } from 'lucide-react';
 import { apiGet, apiPost, apiDelete } from '../../utils/api';
 import { DeviceSummary, DeviceType, CreateDeviceDto } from '@sira/shared';
 import { SecureInput } from '../../components/ui/FormInputs';
+import { BarcodeScannerModal } from '../../components/devices/BarcodeScannerModal';
 import { useAuthStore } from '../../stores/auth.store';
 import toast from 'react-hot-toast';
 
@@ -43,7 +44,44 @@ export const DevicesPage: React.FC = () => {
   const qc = useQueryClient();
   const { user } = useAuthStore();
   const [showAdd, setShowAdd] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   const [filterType, setFilterType] = useState<DeviceType | 'all'>('all');
+
+  const handleScan = (text: string) => {
+    // Smart parser for typical DVR/NVR barcodes (e.g. SN and Password)
+    // Common formats: "SN:12345;PWD:abcd", "12345\nAbcd", or just "123456789"
+    let parsedSN = text;
+    let parsedPwd = '';
+    
+    // Check for common delimiters
+    if (text.includes(';') || text.includes(',')) {
+      const parts = text.split(/[;,]/);
+      parts.forEach(p => {
+        const lower = p.toLowerCase();
+        if (lower.includes('sn:') || lower.includes('sn=')) parsedSN = p.split(/[:=]/)[1].trim();
+        else if (lower.includes('pwd:') || lower.includes('pwd=')) parsedPwd = p.split(/[:=]/)[1].trim();
+        else if (lower.includes('ip:') || lower.includes('ip=')) parsedSN = p.split(/[:=]/)[1].trim();
+      });
+    } else if (text.includes('\n')) {
+      const parts = text.split('\n');
+      parsedSN = parts[0].trim();
+      if (parts.length > 1) parsedPwd = parts[1].trim();
+    } else if (text.includes(':')) {
+      const parts = text.split(':');
+      if (parts.length === 2 && !text.includes('http')) {
+        parsedSN = parts[0].trim();
+        parsedPwd = parts[1].trim();
+      }
+    }
+
+    setForm(prev => ({
+      ...prev,
+      host: parsedSN || prev.host,
+      password: parsedPwd || prev.password,
+    }));
+    setShowScanner(false);
+    toast.success('تم مسح الباركود واستخراج البيانات بنجاح');
+  };
 
   const { data: devices = [], isLoading, refetch } = useQuery<DeviceSummary[]>({
     queryKey: ['devices'],
@@ -267,10 +305,21 @@ export const DevicesPage: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowAdd(false)} />
           <div className="relative card w-full max-w-lg p-6 animate-slide-in-up max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold text-slate-100 mb-5 flex items-center gap-2">
-              <Plus className="w-5 h-5 text-sira-400" />
-              إضافة جهاز جديد
-            </h3>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                <Plus className="w-5 h-5 text-sira-400" />
+                إضافة جهاز جديد
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowScanner(true)}
+                className="btn-secondary btn-sm gap-1 text-xs px-2"
+                title="مسح باركود (SN/QR)"
+              >
+                <ScanBarcode className="w-4 h-4" />
+                مسح باركود
+              </button>
+            </div>
 
             <div className="space-y-4">
               {/* Device type */}
@@ -303,7 +352,7 @@ export const DevicesPage: React.FC = () => {
                 <label className="input-label">اسم الجهاز</label>
                 <input
                   className="input"
-                  placeholder="مثال: راوتر الفرع الرئيسي"
+                  placeholder="مثال: كاميرا المدخل الرئيسي"
                   value={form.name || ''}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                 />
@@ -406,6 +455,14 @@ export const DevicesPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Barcode Scanner Modal */}
+      {showScanner && (
+        <BarcodeScannerModal
+          onClose={() => setShowScanner(false)}
+          onScan={handleScan}
+        />
       )}
     </div>
   );
