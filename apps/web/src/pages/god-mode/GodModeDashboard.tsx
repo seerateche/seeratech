@@ -12,6 +12,9 @@ import { apiGet } from '../../utils/api';
 import { CompanySummary, CompanyStatus, DeviceStatus } from '@sira/shared';
 import { CompanyDetailsModal } from '../../components/dashboard/CompanyDetailsModal';
 import { GlobalStatsCard } from '../../components/dashboard/GlobalStatsCard';
+import { AddCompanyModal } from '../../components/dashboard/AddCompanyModal';
+import { useAuthStore } from '../../stores/auth.store';
+import { useNavigate } from 'react-router-dom';
 
 interface GlobalStats {
   totalCompanies: number;
@@ -26,7 +29,10 @@ interface GlobalStats {
 }
 
 export const GodModeDashboard: React.FC = () => {
+  const { switchToCompany } = useAuthStore();
+  const navigate = useNavigate();
   const [selectedCompany, setSelectedCompany] = useState<CompanySummary | null>(null);
+  const [showAddCompany, setShowAddCompany] = useState(false);
   const [search, setSearch] = useState('');
 
   const { data: stats, isLoading: statsLoading } = useQuery<GlobalStats>({
@@ -133,6 +139,13 @@ export const GodModeDashboard: React.FC = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          <button
+            onClick={() => setShowAddCompany(true)}
+            className="btn-primary btn-sm flex items-center gap-1 shrink-0"
+          >
+            <Building2 className="w-4 h-4" />
+            إضافة شركة
+          </button>
         </div>
 
         <div className="table-container">
@@ -201,6 +214,16 @@ export const GodModeDashboard: React.FC = () => {
                     <td>
                       <div className="flex items-center gap-1">
                         <button
+                          onClick={() => {
+                            switchToCompany(company.id, company.name);
+                            navigate('/dashboard');
+                          }}
+                          className="btn-ghost btn-icon btn-sm text-sira-400 hover:text-sira-300"
+                          title="الدخول كمدير لهذه الشركة"
+                        >
+                          <Building2 className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => setSelectedCompany(company)}
                           className="btn-ghost btn-icon btn-sm"
                           title="عرض التفاصيل"
@@ -231,6 +254,17 @@ export const GodModeDashboard: React.FC = () => {
         <CompanyDetailsModal
           company={selectedCompany}
           onClose={() => setSelectedCompany(null)}
+        />
+      )}
+
+      {/* Add Company Modal */}
+      {showAddCompany && (
+        <AddCompanyModal
+          onClose={() => setShowAddCompany(false)}
+          onSuccess={() => {
+            setShowAddCompany(false);
+            refetch();
+          }}
         />
       )}
     </div>

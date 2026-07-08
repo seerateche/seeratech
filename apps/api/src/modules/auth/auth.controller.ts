@@ -52,6 +52,17 @@ export class RefreshBody {
   refreshToken: string;
 }
 
+export class ChangePasswordBody {
+  @IsString()
+  @IsNotEmpty({ message: 'كلمة المرور الحالية مطلوبة' })
+  currentPassword: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'كلمة المرور الجديدة مطلوبة' })
+  @MinLength(6, { message: 'كلمة المرور الجديدة قصيرة جدًا' })
+  newPassword: string;
+}
+
 // ── Controller ────────────────────────────────────────────────
 
 @ApiTags('auth')
@@ -222,5 +233,17 @@ export class AuthController {
   async logout(@CurrentUser('sub') userId: string) {
     await this.authService.logout(userId);
     return { loggedOut: true };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Change current user password' })
+  async changePassword(
+    @CurrentUser('sub') userId: string,
+    @Body() body: ChangePasswordBody,
+  ) {
+    await this.authService.changePassword(userId, body.currentPassword, body.newPassword);
+    return { success: true };
   }
 }

@@ -19,6 +19,7 @@ interface AuthActions {
   logout:        () => Promise<void>;
   refreshTokens: () => Promise<boolean>;
   setTokens:     (accessToken: string, refreshToken: string) => void;
+  switchToCompany: (companyId: string | null, companyName?: string) => void;
 }
 
 export const useAuthStore = create<AuthState & AuthActions>()(
@@ -74,6 +75,19 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
       setTokens: (accessToken, refreshToken) => {
         set({ accessToken, refreshToken });
+      },
+
+      switchToCompany: (companyId, companyName) => {
+        const { user } = get();
+        if (user && user.role === UserRole.SUPER_ADMIN) {
+          set({
+            user: {
+              ...user,
+              companyId,
+              companyName: companyName || user.companyName,
+            }
+          });
+        }
       },
     }),
     {

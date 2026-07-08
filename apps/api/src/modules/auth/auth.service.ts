@@ -316,6 +316,26 @@ export class AuthService {
     return bcrypt.hash(password, this.BCRYPT_ROUNDS);
   }
 
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    const [user] = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!user) throw new UnauthorizedException('المستخدم غير موجود');
+
+    const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isValid) throw new BadRequestException('كلمة المرور الحالية غير صحيحة');
+
+    const passwordHash = await this.hashPassword(newPassword);
+    
+    await this.db
+      .update(users)
+      .set({ passwordHash })
+      .where(eq(users.id, userId));
+  }
+
   private async handleFailedLogin(userId: string, currentAttempts: number): Promise<void> {
     const newAttempts = currentAttempts + 1;
 

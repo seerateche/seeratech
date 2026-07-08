@@ -7,11 +7,12 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Router, Ticket, Camera,
   Shield, ChevronLeft, ChevronRight, Bell, LogOut,
-  Activity, Wifi, Crown, Menu, X, Fingerprint, Globe,
+  Activity, Wifi, Crown, Menu, X, Fingerprint, Globe, KeyRound
 } from 'lucide-react';
 import { useAuthStore, useIsSuperAdmin } from '../../stores/auth.store';
 import { UserRole } from '@sira/shared';
 import toast from 'react-hot-toast';
+import { ChangePasswordModal } from '../auth/ChangePasswordModal';
 
 // ── Nav definition ────────────────────────────────────────────
 interface NavItem {
@@ -37,6 +38,7 @@ interface Props { children: React.ReactNode; }
 export const DashboardLayout: React.FC<Props> = ({ children }) => {
   const [collapsed,   setCollapsed]   = useState(false);
   const [drawerOpen,  setDrawerOpen]  = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const { user, logout }  = useAuthStore();
   const isSuperAdmin      = useIsSuperAdmin();
   const navigate          = useNavigate();
@@ -126,6 +128,17 @@ export const DashboardLayout: React.FC<Props> = ({ children }) => {
         >
           <LogOut className="w-5 h-5 flex-shrink-0" />
           {(!collapsed || inDrawer) && <span>تسجيل الخروج</span>}
+        </button>
+        <button
+          onClick={() => {
+            if (inDrawer) closeDrawer();
+            setShowChangePassword(true);
+          }}
+          className={`nav-item w-full text-slate-400 hover:text-slate-300 hover:bg-surface-2 mt-1
+                      ${(!collapsed || inDrawer) ? '' : 'justify-center px-2'}`}
+        >
+          <KeyRound className="w-5 h-5 flex-shrink-0" />
+          {(!collapsed || inDrawer) && <span>تغيير كلمة المرور</span>}
         </button>
       </div>
 
@@ -230,6 +243,10 @@ export const DashboardLayout: React.FC<Props> = ({ children }) => {
           })}
         </nav>
       </div>
+
+      {showChangePassword && (
+        <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
+      )}
     </div>
   );
 };
