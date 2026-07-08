@@ -53,6 +53,9 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
       const state = JSON.parse(raw);
       const token = state?.state?.accessToken;
       if (token) config.headers.Authorization = `Bearer ${token}`;
+      
+      const companyId = state?.state?.user?.companyId;
+      if (companyId) config.headers['x-company-id'] = companyId;
     }
   } catch {}
   return config;

@@ -136,8 +136,7 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen overflow-hidden relative flex items-center justify-center" dir="rtl"
-      style={{ background: 'radial-gradient(ellipse 120% 80% at 55% 5%, #102040 0%, #0d1829 40%, #060a12 100%)' }}>
+    <div className="min-h-screen overflow-hidden relative flex items-center justify-center bg-transparent" dir="rtl">
 
       {/* Stars */}
       <div className="fixed inset-0" style={{ zIndex: 0 }}>

@@ -63,7 +63,7 @@ export const DashboardLayout: React.FC<Props> = ({ children }) => {
   const SidebarInner = ({ inDrawer = false }) => (
     <aside
       className={[
-        'flex flex-col h-full bg-surface-1 border-l border-surface-2 transition-all duration-200',
+        'flex flex-col h-full bg-surface-1/80 backdrop-blur-xl border-l border-surface-2/50 transition-all duration-200',
         inDrawer ? 'w-72' : (collapsed ? 'w-16' : 'w-64'),
       ].join(' ')}
     >
@@ -157,7 +157,7 @@ export const DashboardLayout: React.FC<Props> = ({ children }) => {
   );
 
   return (
-    <div className="flex h-screen overflow-hidden bg-surface" dir="rtl">
+    <div className="flex h-screen overflow-hidden bg-transparent" dir="rtl">
 
       {/* ── Desktop sidebar ── */}
       <div className="hidden md:flex relative flex-shrink-0">
@@ -184,7 +184,7 @@ export const DashboardLayout: React.FC<Props> = ({ children }) => {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
         {/* Top bar */}
-        <header className="h-14 bg-surface-1 border-b border-surface-2 flex items-center px-3 gap-2 flex-shrink-0 pt-safe"
+        <header className="h-14 bg-surface-1/80 backdrop-blur-xl border-b border-surface-2/50 flex items-center px-3 gap-2 flex-shrink-0 pt-safe"
           style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 0px)' }}
         >
           {/* Hamburger — mobile only */}
@@ -225,7 +225,7 @@ export const DashboardLayout: React.FC<Props> = ({ children }) => {
         </main>
 
         {/* ── Mobile Bottom Navigation ── */}
-        <nav className="bottom-nav" aria-label="التنقل الرئيسي">
+        <nav className="bottom-nav bg-surface-1/80 backdrop-blur-xl border-t border-surface-2/50" aria-label="التنقل الرئيسي">
           {bottomItems.map((item) => {
             const isActive = location.pathname === item.to ||
               (item.to !== '/dashboard' && location.pathname.startsWith(item.to));

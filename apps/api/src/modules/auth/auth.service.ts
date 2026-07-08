@@ -90,6 +90,14 @@ export class JwtAuthGuard implements CanActivate {
         throw new UnauthorizedException('الحساب غير نشط أو محذوف');
       }
 
+      // Support God Mode: Allow Super Admin to operate in the context of a specific company
+      if (payload.role === UserRole.SUPER_ADMIN) {
+        const overrideCompanyId = request.headers['x-company-id'];
+        if (overrideCompanyId) {
+          payload.companyId = overrideCompanyId;
+        }
+      }
+
       request['user'] = payload;
       return true;
     } catch (err) {

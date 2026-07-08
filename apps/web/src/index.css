@@ -35,7 +35,7 @@
   }
 
   body {
-    @apply bg-surface text-slate-100;
+    @apply text-slate-100;
     font-family: 'IBM Plex Sans Arabic', 'Segoe UI', sans-serif;
     font-size: 14px;
     line-height: 1.6;
@@ -46,6 +46,13 @@
     /* Account for notch/cutout */
     padding-top: var(--safe-top);
     padding-bottom: var(--safe-bottom);
+    
+    /* Global Background Setup */
+    background: linear-gradient(to bottom, rgba(15, 23, 42, 0.85), rgba(15, 23, 42, 0.95)), url('/bg.jpg');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
   }
 
   /* Block-level scroll container for Capacitor */
@@ -99,7 +106,7 @@
 
   /* ── Cards ── */
   .card {
-    @apply bg-surface-1 border border-surface-2 rounded-xl shadow-card;
+    @apply bg-surface-1/80 border border-surface-2/50 rounded-xl shadow-card backdrop-blur-md;
   }
   .card-header {
     @apply px-4 py-3 border-b border-surface-2 flex items-center justify-between flex-wrap gap-2;
@@ -137,7 +144,7 @@
 
   /* ── Input — VISIBLE text for mobile (no password masking style here) ── */
   .input {
-    @apply w-full bg-surface border border-surface-2 rounded-lg px-3 py-3
+    @apply w-full bg-surface/50 backdrop-blur-sm border border-surface-2/50 rounded-lg px-3 py-3
            text-slate-100 placeholder-slate-500
            focus:outline-none focus:border-sira-500 focus:ring-1 focus:ring-sira-500
            transition-colors;
@@ -180,7 +187,6 @@
   /* ── Bottom navigation (mobile only) ── */
   .bottom-nav {
     @apply fixed bottom-0 left-0 right-0 z-40
-           bg-surface-1 border-t border-surface-2
            flex items-center justify-around
            md:hidden;
     padding-bottom: var(--safe-bottom);
