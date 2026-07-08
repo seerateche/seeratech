@@ -1,15 +1,11 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
-import { DatabaseService } from '../../database/database.service';
+import { DRIZZLE_TOKEN, DrizzleDB } from '../../database/database.module';
 import { invoices, expenses, quotations, transactions, vodafoneCashTransfers } from '../../database/schema';
 import { eq, desc, and, sql } from 'drizzle-orm';
 
 @Injectable()
 export class BillingService {
-  constructor(private readonly dbService: DatabaseService) {}
-
-  private get db() {
-    return this.dbService.db;
-  }
+  constructor(@Inject(DRIZZLE_TOKEN) private readonly db: DrizzleDB) {}
 
   async getSummary(companyId: string) {
     // 1. Total Expenses
