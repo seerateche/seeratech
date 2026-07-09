@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { FileText, Plus, Search, MoreVertical, Edit2, Trash2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '../../utils/api';
-import { format } from 'date-fns';
-import { arSA } from 'date-fns/locale';
 import { AddInvoiceModal } from './AddInvoiceModal';
 
 export const InvoicesPage: React.FC = () => {
@@ -88,7 +86,7 @@ export const InvoicesPage: React.FC = () => {
                     <td className="p-4 font-mono text-slate-300">{(inv.taxAmount || 0).toLocaleString('ar-EG')} ج.م</td>
                     <td className="p-4 font-mono font-bold text-slate-200">{(inv.amount || 0).toLocaleString('ar-EG')} ج.م</td>
                     <td className="p-4 text-slate-400">
-                      {format(new Date(inv.createdAt), 'dd MMMM yyyy', { locale: arSA })}
+                      {new Date(inv.createdAt).toLocaleDateString('ar-EG', { day: '2-digit', month: 'long', year: 'numeric' })}
                     </td>
                     <td className="p-4">
                       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${

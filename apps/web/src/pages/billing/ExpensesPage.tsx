@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { CreditCard, Plus, Search, MoreVertical } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from '../../utils/api';
-import { format } from 'date-fns';
-import { arSA } from 'date-fns/locale';
 import { AddExpenseModal } from './AddExpenseModal';
 
 export const ExpensesPage: React.FC = () => {
@@ -81,7 +79,7 @@ export const ExpensesPage: React.FC = () => {
                     <td className="p-4 text-slate-200">{exp.description}</td>
                     <td className="p-4 font-mono font-bold text-rose-400">{(exp.amount || 0).toLocaleString('ar-EG')} ج.م</td>
                     <td className="p-4 text-slate-400">
-                      {format(new Date(exp.expenseDate || exp.createdAt), 'dd MMMM yyyy', { locale: arSA })}
+                      {new Date(exp.expenseDate || exp.createdAt).toLocaleDateString('ar-EG', { day: '2-digit', month: 'long', year: 'numeric' })}
                     </td>
                     <td className="p-4 text-left">
                       <button className="btn-ghost btn-icon w-8 h-8 opacity-0 group-hover:opacity-100">
