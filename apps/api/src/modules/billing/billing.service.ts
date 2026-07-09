@@ -1,6 +1,6 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { DRIZZLE_TOKEN, DrizzleDB } from '../../database/database.module';
-import { invoices, expenses, quotations, transactions, vodafoneCashTransfers } from '../../database/schema';
+import { invoices, expenses, quotations, transactions, vodafoneCashTransfers, subscriptionOffers } from '../../database/schema';
 import { eq, desc, and, sql } from 'drizzle-orm';
 
 @Injectable()
@@ -92,5 +92,50 @@ export class BillingService {
       where: eq(expenses.companyId, companyId),
       orderBy: [desc(expenses.expenseDate)],
     });
+  }
+
+  async createInvoice(companyId: string, data: any) {
+    const invNum = `INV-${Math.floor(10000 + Math.random() * 90000)}`;
+    const [newInv] = await this.db.insert(invoices).values({
+      companyId,
+      invoiceNumber: invNum,
+      customerName: data.customerName,
+      customerPhone: data.customerPhone,
+      subTotal: data.subTotal,
+      taxAmount: data.taxAmount,
+      amount: data.amount,
+      dueDate: data.dueDate ? new Date(data.dueDate) : null,
+      notes: data.notes,
+    }).returning();
+    return newInv;
+  }
+
+  async createExpense(companyId: string, data: any) {
+    const [newExp] = await this.db.insert(expenses).values({
+      companyId,
+      category: data.category,
+      amount: data.amount,
+      description: data.description,
+    }).returning();
+    return newExp;
+  }
+
+  async getSubscriptionOffers(companyId: string) {
+    return this.db.query.subscriptionOffers.findMany({
+      where: eq(subscriptionOffers.companyId, companyId),
+      orderBy: [desc(subscriptionOffers.createdAt)],
+    });
+  }
+
+  async createSubscriptionOffer(companyId: string, data: any) {
+    const [newOffer] = await this.db.insert(subscriptionOffers).values({
+      companyId,
+      name: data.name,
+      price: data.price,
+      speed: data.speed,
+      quota: data.quota,
+      durationDays: data.durationDays,
+    }).returning();
+    return newOffer;
   }
 }

@@ -600,7 +600,9 @@ export const invoices = pgTable(
     customerId: uuid('customer_id'), // Can reference users/subscribers if needed
     customerName: varchar('customer_name', { length: 255 }).notNull(),
     customerPhone: varchar('customer_phone', { length: 50 }),
-    amount: integer('amount').notNull(), // stored in cents/piasters or just integer
+    subTotal: integer('sub_total').notNull().default(0),
+    taxAmount: integer('tax_amount').notNull().default(0),
+    amount: integer('amount').notNull(), // stored in cents/piasters or just integer (total amount)
     status: invoiceStatusEnum('status').notNull().default('unpaid'),
     dueDate: timestamp('due_date', { withTimezone: true }),
     paidAt: timestamp('paid_at', { withTimezone: true }),
@@ -687,6 +689,26 @@ export const vodafoneCashTransfers = pgTable(
   })
 );
 
+export const subscriptionOffers = pgTable(
+  'subscription_offers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    companyId: uuid('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 255 }).notNull(),
+    price: integer('price').notNull(),
+    speed: varchar('speed', { length: 50 }), // e.g., '30 Mbps'
+    quota: varchar('quota', { length: 50 }), // e.g., '140 GB'
+    durationDays: integer('duration_days').notNull().default(30),
+    isPopular: boolean('is_popular').default(false),
+    isActive: boolean('is_active').default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    companyIdx: index('offers_company_idx').on(t.companyId),
+  })
+);
+
 // ── Billing Relations ────────────────────────────────────────
 
 export const invoiceRelations = relations(invoices, ({ one }) => ({
@@ -724,6 +746,13 @@ export const vodafoneCashRelations = relations(vodafoneCashTransfers, ({ one }) 
   }),
 }));
 
+export const subscriptionOffersRelations = relations(subscriptionOffers, ({ one }) => ({
+  company: one(companies, {
+    fields: [subscriptionOffers.companyId],
+    references: [companies.id],
+  }),
+}));
+
 export type Invoice = typeof invoices.$inferSelect;
 export type NewInvoice = typeof invoices.$inferInsert;
 export type Quotation = typeof quotations.$inferSelect;
@@ -734,3 +763,5 @@ export type Transaction = typeof transactions.$inferSelect;
 export type NewTransaction = typeof transactions.$inferInsert;
 export type VodafoneCashTransfer = typeof vodafoneCashTransfers.$inferSelect;
 export type NewVodafoneCashTransfer = typeof vodafoneCashTransfers.$inferInsert;
+export type SubscriptionOffer = typeof subscriptionOffers.$inferSelect;
+export type NewSubscriptionOffer = typeof subscriptionOffers.$inferInsert;

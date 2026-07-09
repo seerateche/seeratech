@@ -22,6 +22,13 @@
       "when": 1783548500000,
       "tag": "0003_billing_accounting",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1783584850000,
+      "tag": "0004_invoices_tax_offers",
+      "breakpoints": true
     }
   ]
 }

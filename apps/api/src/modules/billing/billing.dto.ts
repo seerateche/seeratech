@@ -44,3 +44,79 @@ export class CreateQuotationDto {
   @IsOptional()
   validUntil?: string;
 }
+
+export class CreateInvoiceDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  customerName: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  customerPhone?: string;
+
+  @ApiProperty()
+  @IsNumber()
+  subTotal: number;
+
+  @ApiProperty()
+  @IsNumber()
+  taxAmount: number;
+
+  @ApiProperty()
+  @IsNumber()
+  amount: number;
+
+  @ApiProperty({ required: false })
+  @IsDateString()
+  @IsOptional()
+  dueDate?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  notes?: string;
+}
+
+export class CreateExpenseDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  category: string;
+
+  @ApiProperty()
+  @IsNumber()
+  amount: number;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  description: string;
+}
+
+export class CreateSubscriptionOfferDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ApiProperty()
+  @IsNumber()
+  price: number;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  speed?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  quota?: string;
+
+  @ApiProperty({ required: false })
+  @IsNumber()
+  @IsOptional()
+  durationDays?: number;
+}

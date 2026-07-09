@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, UseGuards, Request } from '@nestjs/common';
 import { BillingService } from './billing.service';
-import { CreateQuotationDto } from './billing.dto';
+import { CreateQuotationDto, CreateInvoiceDto, CreateExpenseDto, CreateSubscriptionOfferDto } from './billing.dto';
 import { JwtAuthGuard } from '../auth/auth.service';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
@@ -39,5 +39,29 @@ export class BillingController {
   @ApiOperation({ summary: 'Get all expenses' })
   getExpenses(@Request() req: any) {
     return this.billingService.getExpenses(req.user.companyId);
+  }
+
+  @Post('invoices')
+  @ApiOperation({ summary: 'Create a new invoice' })
+  createInvoice(@Request() req: any, @Body() data: CreateInvoiceDto) {
+    return this.billingService.createInvoice(req.user.companyId, data);
+  }
+
+  @Post('expenses')
+  @ApiOperation({ summary: 'Create a new expense' })
+  createExpense(@Request() req: any, @Body() data: CreateExpenseDto) {
+    return this.billingService.createExpense(req.user.companyId, data);
+  }
+
+  @Get('offers')
+  @ApiOperation({ summary: 'Get subscription offers' })
+  getSubscriptionOffers(@Request() req: any) {
+    return this.billingService.getSubscriptionOffers(req.user.companyId);
+  }
+
+  @Post('offers')
+  @ApiOperation({ summary: 'Create a subscription offer' })
+  createSubscriptionOffer(@Request() req: any, @Body() data: CreateSubscriptionOfferDto) {
+    return this.billingService.createSubscriptionOffer(req.user.companyId, data);
   }
 }

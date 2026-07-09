@@ -30,6 +30,9 @@ import { BillingDashboard } from './pages/billing/BillingDashboard';
 import { InvoicesPage }     from './pages/billing/InvoicesPage';
 import { QuotationsPage }   from './pages/billing/QuotationsPage';
 import { ExpensesPage }     from './pages/billing/ExpensesPage';
+import { TransactionHistoryPage } from './pages/billing/TransactionHistoryPage';
+import { VodafoneCashPage } from './pages/billing/VodafoneCashPage';
+import { SubscriptionOffersPage } from './pages/offers/SubscriptionOffersPage';
 import { AuthGuard }        from './components/auth/AuthGuard';
 import { UserRole }         from '@sira/shared';
 
@@ -107,6 +110,9 @@ const router = createHashRouter([
       { path: 'billing/invoices',           element: <InvoicesPage /> },
       { path: 'billing/quotations',         element: <QuotationsPage /> },
       { path: 'billing/expenses',           element: <ExpensesPage /> },
+      { path: 'billing/transactions',       element: <TransactionHistoryPage /> },
+      { path: 'billing/vodafone-cash',      element: <VodafoneCashPage /> },
+      { path: 'offers',                     element: <SubscriptionOffersPage /> },
       { path: '*',                          element: <Navigate to="/dashboard" replace /> },
     ],
   },
