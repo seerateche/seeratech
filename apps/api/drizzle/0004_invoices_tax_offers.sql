@@ -12,9 +12,9 @@ CREATE TABLE IF NOT EXISTS "subscription_offers" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "invoices" ADD COLUMN "sub_total" integer DEFAULT 0 NOT NULL;
+ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "sub_total" integer DEFAULT 0 NOT NULL;
 --> statement-breakpoint
-ALTER TABLE "invoices" ADD COLUMN "tax_amount" integer DEFAULT 0 NOT NULL;
+ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "tax_amount" integer DEFAULT 0 NOT NULL;
 --> statement-breakpoint
 DO $$ BEGIN
  ALTER TABLE "subscription_offers" ADD CONSTRAINT "subscription_offers_company_id_companies_id_fk" FOREIGN KEY ("company_id") REFERENCES "public"."companies"("id") ON DELETE cascade ON UPDATE no action;
