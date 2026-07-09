@@ -53,14 +53,14 @@ export class BillingController {
     return this.billingService.createExpense(req.user.companyId, data);
   }
 
-  @Get('offers')
-  @ApiOperation({ summary: 'Get subscription offers' })
+  @Get('packages')
+  @ApiOperation({ summary: 'Get subscription packages' })
   getSubscriptionOffers(@Request() req: any) {
     return this.billingService.getSubscriptionOffers(req.user.companyId);
   }
 
-  @Post('offers')
-  @ApiOperation({ summary: 'Create a subscription offer' })
+  @Post('packages')
+  @ApiOperation({ summary: 'Create a subscription package' })
   createSubscriptionOffer(@Request() req: any, @Body() data: CreateSubscriptionOfferDto) {
     return this.billingService.createSubscriptionOffer(req.user.companyId, data);
   }

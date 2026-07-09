@@ -17,10 +17,10 @@ export const AddOfferModal: React.FC<Props> = ({ onClose }) => {
   const [durationDays, setDurationDays] = useState<number>(30);
 
   const mutation = useMutation({
-    mutationFn: (data: any) => apiPost('/billing/offers', data),
+    mutationFn: (data: any) => apiPost('/billing/packages', data),
     onSuccess: () => {
       toast.success('تم إنشاء العرض بنجاح');
-      queryClient.invalidateQueries({ queryKey: ['billing', 'offers'] });
+      queryClient.invalidateQueries({ queryKey: ['billing', 'packages'] });
       onClose();
     },
     onError: (err: any) => {

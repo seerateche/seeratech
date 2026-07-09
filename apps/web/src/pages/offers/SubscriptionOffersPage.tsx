@@ -9,8 +9,8 @@ export const SubscriptionOffersPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const { data: offers = [], isLoading } = useQuery({
-    queryKey: ['billing', 'offers'],
-    queryFn: () => apiGet('/billing/offers'),
+    queryKey: ['billing', 'packages'],
+    queryFn: () => apiGet('/billing/packages'),
   });
 
   const filteredOffers = offers.filter((offer: any) => 
