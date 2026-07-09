@@ -32,11 +32,10 @@ async function main() {
   const databaseUrl = process.env.DATABASE_URL;
   const dbSslConfig  = process.env.DB_SSL;
 
-  let sslEnabled: boolean;
-  if (dbSslConfig === 'false')     sslEnabled = false;
-  else if (dbSslConfig === 'true') sslEnabled = true;
-  else sslEnabled = false; // Default to false for Railway internal network
-
+  let sslEnabled = true;
+  if (dbSslConfig === 'false') {
+    sslEnabled = false;
+  }
   const ssl: any = sslEnabled ? { rejectUnauthorized: false } : false;
 
   const pool = databaseUrl
