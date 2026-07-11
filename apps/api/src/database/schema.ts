@@ -551,6 +551,14 @@ export interface IspQuotaDetails {
     totalGb: number;
   }>;
   rawResponse?:    unknown;  // Raw API blob for debugging
+
+  // ── Data provenance (transparency) ──────────────────────────
+  // isMock=true means the numbers below are DEMO/placeholder data
+  // returned because a live connection to the ISP could not be made.
+  // The UI MUST surface this so operators are never misled.
+  isMock?:         boolean;
+  dataSource?:     'live' | 'mock' | 'manual';  // where the numbers came from
+  mockReason?:     string;   // Arabic explanation of why live sync failed
 }
 
 // ── ISP Account Relations ─────────────────────────────────────

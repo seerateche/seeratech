@@ -289,10 +289,20 @@ export const IspQuotaView: React.FC = () => {
 
   const syncMutation = useMutation({
     mutationFn: (id: string) => apiPost(`/isp-tracking/${id}/sync`),
-    onSuccess: (_, id) => {
+    onSuccess: (res: any, id) => {
       setSyncingIds((s) => { const n = new Set(s); n.delete(id); return n; });
       qc.invalidateQueries({ queryKey: ['isp-accounts'] });
-      toast.success('تم تحديث الكوتا ✓');
+      // Be honest: if the backend fell back to demo data, say so.
+      // apiPost already unwraps the envelope, so `res` is the account itself.
+      const isMock = res?.quotaDetails?.isMock;
+      if (isMock) {
+        toast('تم عرض بيانات تجريبية — تعذّر الاتصال الفعلي بخدمة WE', {
+          icon: '🧪',
+          style: { background: '#78350f', color: '#fde68a', border: '1px solid #b45309' },
+        });
+      } else {
+        toast.success('تم تحديث الكوتا ✓');
+      }
     },
     onError: (e: any, id) => {
       setSyncingIds((s) => { const n = new Set(s); n.delete(id); return n; });
