@@ -157,14 +157,12 @@ export class WeApiClient {
         subscriberName: data.subscriber_name ?? data.name ?? '',
       };
     } catch (err: any) {
-      this.logger.warn('WE API login failed (possibly IP block). Returning mock token for demo.');
-      return {
-        token:          'mock_token_12345',
-        refreshToken:   'mock_refresh_12345',
-        expiresIn:      3600,
-        accountId:      phoneNumber,
-        subscriberName: 'عميل WE (بيانات تجريبية)',
-      };
+      // Do NOT silently return a fake token — that hides real failures.
+      // Map to a proper WE error so the caller can decide how to react
+      // (e.g. fall back to clearly-labelled mock data, or surface the error).
+      if (err?.isWeError) throw err;
+      this.logger.warn(`WE API login failed for ${phoneNumber}: ${err?.message ?? 'unknown'}`);
+      throw this.mapAxiosError(err);
     }
   }
 
@@ -218,83 +216,43 @@ export class WeApiClient {
         bundles,
       };
     } catch (err: any) {
-      this.logger.warn('WE API quota fetch failed. Returning mock quota for demo.');
-      return {
-        accountNumber:  accountId,
-        subscriberName: 'عميل WE (بيانات تجريبية)',
-        lineStatus:     'Active',
-        planName:       'WE Space Super 250GB',
-        bundles: [
-          {
-            bundleName:    'Main Quota',
-            totalValue:    250,
-            usedValue:     115,
-            remainingValue: 135,
-            unit:          'GB',
-            expiryDate:    new Date(Date.now() + 15 * 86400000).toISOString(),
-            isMainBundle:  true,
-          }
-        ],
-      };
+      // Surface the real failure instead of masking it with fake numbers.
+      if (err?.isWeError) throw err;
+      this.logger.warn(`WE API quota fetch failed: ${err?.message ?? 'unknown'}`);
+      throw this.mapAxiosError(err);
     }
   }
 
-  // ── Quota Fallback (Scraper Strategy) ────────────────────────
+  // ── Demo / Placeholder Data ──────────────────────────────────
 
   /**
-   * Secondary strategy: fetch quota via web portal if mobile API changes.
-   * Uses a different endpoint structure (my.te.eg web portal).
+   * Returns clearly-labelled DEMO quota data.
+   *
+   * ⚠️  This is NOT real data. WE (Telecom Egypt) does not expose a
+   * public quota API, and their portal requires OTP / bot protection
+   * that blocks server-side automation. Until a real integration is
+   * available, callers may use this so the dashboard stays functional —
+   * but the returned payload is explicitly flagged as mock and the UI
+   * must display a "بيانات تجريبية" banner. Never present this as live.
    */
-  async fetchQuotaWebFallback(phoneNumber: string, password: string): Promise<WeAccountInfo> {
-    this.logger.warn('Falling back to WE web portal strategy');
-    try {
-      // Step 1: Get CSRF token from portal login page
-      const portalBase = 'https://my.te.eg';
-      const loginPage  = await axios.get(`${portalBase}/Login`, {
-        headers: { 'User-Agent': this.MOBILE_HEADERS['User-Agent'] },
-        timeout: 15_000,
-      });
-
-      // Extract CSRF token from HTML
-      const csrfMatch = loginPage.data?.match(
-        /name="__RequestVerificationToken"[^>]+value="([^"]+)"/,
-      );
-      const csrf = csrfMatch?.[1] ?? '';
-
-      const cookies = (loginPage.headers['set-cookie'] ?? []).join('; ');
-
-      // Step 2: POST login form
-      const loginRes = await axios.post(
-        `${portalBase}/Login`,
-        new URLSearchParams({
-          PhoneNumber:                phoneNumber,
-          Password:                   password,
-          __RequestVerificationToken: csrf,
-        }).toString(),
+  buildMockAccountInfo(phoneNumber: string, accountId?: string): WeAccountInfo {
+    return {
+      accountNumber:  accountId || phoneNumber,
+      subscriberName: 'عميل WE (بيانات تجريبية)',
+      lineStatus:     'Active',
+      planName:       'WE Space Super 250GB (تجريبي)',
+      bundles: [
         {
-          headers: {
-            'User-Agent':   this.MOBILE_HEADERS['User-Agent'],
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Cookie':       cookies,
-            'Referer':      `${portalBase}/Login`,
-          },
-          maxRedirects: 0,
-          validateStatus: (s) => s < 400,
-          timeout: 20_000,
+          bundleName:     'Main Quota',
+          totalValue:     250,
+          usedValue:      115,
+          remainingValue: 135,
+          unit:           'GB',
+          expiryDate:     new Date(Date.now() + 15 * 86400000).toISOString(),
+          isMainBundle:   true,
         },
-      );
-
-      if (loginRes.status !== 302 && loginRes.status !== 200) {
-        throw this.makeError('INVALID_CREDENTIALS');
-      }
-
-      // Step 3: Fetch usage page (simplified — returns error for now)
-      // Full implementation would parse the HTML usage dashboard
-      throw this.makeError('SERVICE_UNAVAILABLE');
-    } catch (err: any) {
-      if (err.isWeError) throw err;
-      throw this.mapAxiosError(err);
-    }
+      ],
+    };
   }
 
   // ── Helpers ───────────────────────────────────────────────────

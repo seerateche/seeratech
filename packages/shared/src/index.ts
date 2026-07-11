@@ -313,6 +313,12 @@ export interface IspQuotaDetails {
   subscriberName?: string;
   lineStatus?:     string;
   addons?:         Array<{ name: string; usedGb: number; totalGb: number }>;
+  // ── Data provenance (transparency) ──────────────────────────
+  // isMock=true → the numbers are DEMO/placeholder, not live data.
+  // The UI must show a "بيانات تجريبية" banner when this is set.
+  isMock?:         boolean;
+  dataSource?:     'live' | 'mock' | 'manual';
+  mockReason?:     string;
 }
 
 export interface IspAccount {

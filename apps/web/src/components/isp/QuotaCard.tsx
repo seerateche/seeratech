@@ -6,7 +6,7 @@ import React, { useState } from 'react';
 import {
   RefreshCw, Phone, Wifi, AlertTriangle, CheckCircle2,
   XCircle, Clock, Zap, HardDrive, TrendingUp, MoreVertical,
-  Edit2, Trash2, WifiOff,
+  Edit2, Trash2, WifiOff, FlaskConical,
 } from 'lucide-react';
 import { IspAccount, IspQuotaDetails } from '@sira/shared';
 
@@ -214,6 +214,12 @@ export const QuotaCard: React.FC<QuotaCardProps> = ({
 
         {/* Right side: badge + menu */}
         <div className="flex items-center gap-2 flex-shrink-0">
+          {q.isMock && (
+            <span className="badge bg-amber-900/40 text-amber-300 border border-amber-700/50">
+              <FlaskConical className="w-3 h-3" />
+              تجريبي
+            </span>
+          )}
           <StatusBadge status={account.status} lineStatus={q.lineStatus} />
 
           {/* Context menu */}
@@ -269,6 +275,22 @@ export const QuotaCard: React.FC<QuotaCardProps> = ({
             <Zap className="w-3 h-3" />
             {q.planName}
           </span>
+        </div>
+      )}
+
+      {/* ── Mock/demo data banner (transparency) ── */}
+      {q.isMock && (
+        <div className="mx-4 mb-3 flex items-start gap-2 bg-amber-900/20 border border-amber-700/40 rounded-xl px-3 py-2.5">
+          <FlaskConical className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <p className="text-xs text-amber-300 font-semibold leading-relaxed">
+              بيانات تجريبية — ليست فعلية
+            </p>
+            <p className="text-[11px] text-amber-400/80 leading-relaxed mt-0.5">
+              تعذّر الاتصال المباشر بخدمة WE. الأرقام المعروضة للعرض فقط لحين
+              توفير التكامل الفعلي.
+            </p>
+          </div>
         </div>
       )}
 

@@ -15,7 +15,7 @@ import { eq, and, desc } from 'drizzle-orm';
 import { DRIZZLE_TOKEN, DrizzleDB } from '../../database/database.module';
 import { ispAccounts, companies, IspQuotaDetails } from '../../database/schema';
 import { SecurityService } from '../../security/security.service';
-import { WeApiClient } from './we-api.client';
+import { WeApiClient, WeAccountInfo } from './we-api.client';
 
 // ── DTOs ──────────────────────────────────────────────────────
 
@@ -49,6 +49,13 @@ export class IspTrackingService {
   private readonly logger = new Logger(IspTrackingService.name);
   // In-progress sync set — prevents double-syncing the same account
   private readonly syncInProgress = new Set<string>();
+
+  // TEMPORARY: fall back to clearly-labelled DEMO data when the live WE
+  // integration is unavailable. Enabled by default until a real API exists.
+  // Disable in production by setting ISP_MOCK_FALLBACK=false once we have
+  // a working live integration.
+  private readonly mockFallbackEnabled =
+    (process.env.ISP_MOCK_FALLBACK ?? 'true').toLowerCase() !== 'false';
 
   constructor(
     @Inject(DRIZZLE_TOKEN)  private readonly db: DrizzleDB,
@@ -128,7 +135,7 @@ export class IspTrackingService {
       .select()
       .from(ispAccounts)
       .where(
-        and(eq(ispAccounts.id, companyId ? id : id),
+        and(eq(ispAccounts.id, id),
             eq(ispAccounts.companyId, companyId)),
       )
       .limit(1);
@@ -259,79 +266,33 @@ export class IspTrackingService {
       // 3. Login if no valid cached token
       if (!token) {
         this.logger.log(`Logging in to WE API for ${account.phoneNumber}`);
-        let authResp;
-        try {
-          authResp = await this.weClient.login(account.phoneNumber, password);
-        } catch (loginErr: any) {
-          // Try web fallback if mobile API fails
-          if (['SERVICE_UNAVAILABLE', 'UNEXPECTED_RESPONSE'].includes(loginErr.code)) {
-            this.logger.warn('Mobile API failed, trying web fallback');
-            authResp = await this.weClient.fetchQuotaWebFallback(account.phoneNumber, password)
-              .then(() => null) // fallback returns account info directly
-              .catch(() => { throw loginErr; }); // re-throw original
-          } else {
-            throw loginErr;
-          }
-        }
+        // Any login failure propagates to the outer catch, which decides
+        // whether to fall back to labelled demo data or surface the error.
+        const authResp = await this.weClient.login(account.phoneNumber, password);
 
-        if (authResp) {
-          token     = authResp.token;
-          accountId = authResp.accountId;
+        token     = authResp.token;
+        accountId = authResp.accountId;
 
-          // Cache encrypted session token (valid for expiresIn seconds).
-          // Store as "iv:ciphertext:tag" so the GCM auth tag survives the
-          // round-trip and the cached token actually decrypts on next use.
-          const tokenEnc = this.security.encrypt(token);
-          const expiresAt = new Date(Date.now() + (authResp.expiresIn - 60) * 1000);
-          await this.db
-            .update(ispAccounts)
-            .set({
-              encryptedSessionToken: `${tokenEnc.iv}:${tokenEnc.ciphertext}:${tokenEnc.tag}`,
-              sessionTokenExpiresAt: expiresAt,
-            })
-            .where(eq(ispAccounts.id, id));
-        }
+        // Cache encrypted session token (valid for expiresIn seconds).
+        // Store as "iv:ciphertext:tag" so the GCM auth tag survives the
+        // round-trip and the cached token actually decrypts on next use.
+        const tokenEnc = this.security.encrypt(token);
+        const expiresAt = new Date(Date.now() + (authResp.expiresIn - 60) * 1000);
+        await this.db
+          .update(ispAccounts)
+          .set({
+            encryptedSessionToken: `${tokenEnc.iv}:${tokenEnc.ciphertext}:${tokenEnc.tag}`,
+            sessionTokenExpiresAt: expiresAt,
+          })
+          .where(eq(ispAccounts.id, id));
       }
 
-      // 4. Fetch quota
+      // 4. Fetch quota (live)
       const accountInfo = await this.weClient.fetchQuota(token!, accountId);
 
-      // 5. Transform to IspQuotaDetails
-      const mainBundle = accountInfo.bundles.find((b) => b.isMainBundle)
-        ?? accountInfo.bundles[0];
+      // 5. Transform + persist as LIVE data
+      const quotaDetails = this.transformAccountInfo(accountInfo, 'live');
 
-      const usedGb      = mainBundle?.usedValue      ?? 0;
-      const totalGb     = mainBundle?.totalValue      ?? 0;
-      const remainingGb = mainBundle?.remainingValue  ?? Math.max(0, totalGb - usedGb);
-      const usagePercent = totalGb > 0 ? Math.round((usedGb / totalGb) * 100) : 0;
-
-      let daysRemaining: number | undefined;
-      if (mainBundle?.expiryDate) {
-        const exp = new Date(mainBundle.expiryDate);
-        daysRemaining = Math.max(0, Math.ceil((exp.getTime() - Date.now()) / 86_400_000));
-      }
-
-      const quotaDetails: IspQuotaDetails = {
-        planName:       accountInfo.planName,
-        totalGb,
-        usedGb,
-        remainingGb,
-        usagePercent,
-        expiryDate:     mainBundle?.expiryDate,
-        daysRemaining,
-        accountNumber:  accountInfo.accountNumber,
-        subscriberName: accountInfo.subscriberName,
-        lineStatus:     accountInfo.lineStatus,
-        addons: accountInfo.bundles
-          .filter((b) => !b.isMainBundle)
-          .map((b) => ({
-            name:    b.bundleName,
-            usedGb:  b.usedValue,
-            totalGb: b.totalValue,
-          })),
-      };
-
-      // 6. Persist
       const [updated] = await this.db
         .update(ispAccounts)
         .set({
@@ -345,19 +306,51 @@ export class IspTrackingService {
         .returning();
 
       this.logger.log(
-        `✓ Synced quota for ${account.phoneNumber}: ` +
-        `${usedGb}/${totalGb} GB (${usagePercent}%)`,
+        `✓ Synced LIVE quota for ${account.phoneNumber}: ` +
+        `${quotaDetails.usedGb}/${quotaDetails.totalGb} GB (${quotaDetails.usagePercent}%)`,
       );
 
       return this.toPublic(updated);
     } catch (err: any) {
-      // Graceful error — store Arabic message in DB, mark as error
       const errorMsg = err.isWeError
         ? err.message
         : `خطأ غير متوقع: ${err.message?.slice(0, 100) ?? 'unknown'}`;
 
-      this.logger.error(`Sync failed for account ${id}: ${errorMsg}`);
+      // ── Mock fallback (TEMPORARY) ──────────────────────────────
+      // WE has no public quota API yet. To keep the dashboard usable we
+      // may fall back to clearly-labelled DEMO data — but ONLY when the
+      // ISP_MOCK_FALLBACK flag is enabled, and we always mark it isMock
+      // so the UI shows a "بيانات تجريبية" banner (never faked as live).
+      if (this.mockFallbackEnabled) {
+        this.logger.warn(
+          `Live WE sync failed for ${account.phoneNumber} (${errorMsg}). ` +
+          `Falling back to DEMO data (isMock=true).`,
+        );
 
+        const mockInfo = this.weClient.buildMockAccountInfo(account.phoneNumber);
+        const quotaDetails = this.transformAccountInfo(mockInfo, 'mock', errorMsg);
+
+        // NOTE: we keep DB status as 'active' (the enum has no 'mock' value,
+        // and adding one would need a PostgreSQL enum migration). The mock
+        // nature is carried transparently in quotaDetails.isMock + lastError,
+        // which the UI reads to show the "بيانات تجريبية" banner.
+        const [updated] = await this.db
+          .update(ispAccounts)
+          .set({
+            status:       'active',
+            quotaDetails,
+            lastSyncedAt: new Date(),
+            lastError:    `بيانات تجريبية — تعذّر الاتصال الفعلي: ${errorMsg}`,
+            updatedAt:    new Date(),
+          })
+          .where(eq(ispAccounts.id, id))
+          .returning();
+
+        return this.toPublic(updated);
+      }
+
+      // Mock disabled → surface the real failure
+      this.logger.error(`Sync failed for account ${id}: ${errorMsg}`);
       await this.db
         .update(ispAccounts)
         .set({
@@ -367,11 +360,61 @@ export class IspTrackingService {
         })
         .where(eq(ispAccounts.id, id));
 
-      // Re-throw so controller can return proper HTTP status
       throw new InternalServerErrorException(errorMsg);
     } finally {
       this.syncInProgress.delete(id);
     }
+  }
+
+  // ── Quota transform helper ────────────────────────────────────
+
+  /**
+   * Converts a raw WeAccountInfo into the persisted IspQuotaDetails shape.
+   * `source` records provenance (live / mock / manual) and, for mock data,
+   * `mockReason` carries the Arabic explanation of why live sync failed.
+   */
+  private transformAccountInfo(
+    accountInfo: WeAccountInfo,
+    source:      'live' | 'mock' | 'manual',
+    mockReason?: string,
+  ): IspQuotaDetails {
+    const mainBundle =
+      accountInfo.bundles.find((b) => b.isMainBundle) ?? accountInfo.bundles[0];
+
+    const usedGb       = mainBundle?.usedValue     ?? 0;
+    const totalGb      = mainBundle?.totalValue    ?? 0;
+    const remainingGb  = mainBundle?.remainingValue ?? Math.max(0, totalGb - usedGb);
+    const usagePercent = totalGb > 0 ? Math.round((usedGb / totalGb) * 100) : 0;
+
+    let daysRemaining: number | undefined;
+    if (mainBundle?.expiryDate) {
+      const exp = new Date(mainBundle.expiryDate);
+      daysRemaining = Math.max(0, Math.ceil((exp.getTime() - Date.now()) / 86_400_000));
+    }
+
+    return {
+      planName:       accountInfo.planName,
+      totalGb,
+      usedGb,
+      remainingGb,
+      usagePercent,
+      expiryDate:     mainBundle?.expiryDate,
+      daysRemaining,
+      accountNumber:  accountInfo.accountNumber,
+      subscriberName: accountInfo.subscriberName,
+      lineStatus:     accountInfo.lineStatus,
+      addons: accountInfo.bundles
+        .filter((b) => !b.isMainBundle)
+        .map((b) => ({
+          name:    b.bundleName,
+          usedGb:  b.usedValue,
+          totalGb: b.totalValue,
+        })),
+      // Provenance flags (transparency)
+      isMock:     source === 'mock',
+      dataSource: source,
+      mockReason: source === 'mock' ? mockReason : undefined,
+    };
   }
 
   // ── Scheduled Sync (all active accounts) ─────────────────────
