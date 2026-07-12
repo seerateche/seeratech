@@ -361,4 +361,226 @@ export class ZkService {
       this.realtimeListeners.delete(deviceId);
     }
   }
+
+  // ── Employee CRUD ─────────────────────────────────────────────
+
+  async getEmployees(companyId: string) {
+    const { eq: dbEq, desc: dbDesc, asc } = await import('drizzle-orm');
+    return this.db
+      .select()
+      .from(employees)
+      .where(dbEq(employees.companyId, companyId))
+      .orderBy(asc(employees.name));
+  }
+
+  async createEmployee(companyId: string, data: any) {
+    const { eq: dbEq } = await import('drizzle-orm');
+    const [created] = await this.db
+      .insert(employees)
+      .values({
+        companyId,
+        zkEmployeeId: data.zkEmployeeId,
+        name: data.name,
+        department: data.department,
+        position: data.position,
+        email: data.email,
+        phone: data.phone,
+      })
+      .returning();
+    return created;
+  }
+
+  async updateEmployee(id: string, companyId: string, data: any) {
+    const { eq: dbEq, and: dbAnd } = await import('drizzle-orm');
+    const [updated] = await this.db
+      .update(employees)
+      .set({
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.department !== undefined && { department: data.department }),
+        ...(data.position !== undefined && { position: data.position }),
+        ...(data.email !== undefined && { email: data.email }),
+        ...(data.phone !== undefined && { phone: data.phone }),
+        ...(data.isActive !== undefined && { isActive: data.isActive }),
+        updatedAt: new Date(),
+      })
+      .where(dbAnd(dbEq(employees.id, id), dbEq(employees.companyId, companyId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteEmployee(id: string, companyId: string) {
+    const { eq: dbEq, and: dbAnd } = await import('drizzle-orm');
+    await this.db
+      .delete(employees)
+      .where(dbAnd(dbEq(employees.id, id), dbEq(employees.companyId, companyId)));
+  }
+
+  async syncEmployeesFromDevice(deviceId: string, companyId: string): Promise<number> {
+    const zk = await this.getZkInstance(deviceId, companyId);
+
+    const zkUsers: ZKUser[] = await new Promise((resolve, reject) => {
+      zk.getUsers((err: Error | null, data: ZKUser[]) => {
+        if (err) reject(err);
+        else resolve(data || []);
+      });
+    });
+
+    let count = 0;
+    const { eq: dbEq } = await import('drizzle-orm');
+    for (const user of zkUsers) {
+      await this.db
+        .insert(employees)
+        .values({
+          companyId,
+          zkEmployeeId: parseInt(user.userId) || user.uid,
+          name: user.name || `موظف ${user.userId}`,
+        })
+        .onConflictDoUpdate({
+          target: [employees.companyId, employees.zkEmployeeId],
+          set: { name: user.name || `موظف ${user.userId}`, updatedAt: new Date() },
+        });
+      count++;
+    }
+    return count;
+  }
+
+  // ── Daily Stats ───────────────────────────────────────────────
+
+  async getDailyStats(companyId: string, date: string) {
+    const { eq: dbEq, and: dbAnd, gte: dbGte, lte: dbLte } = await import('drizzle-orm');
+
+    const start = new Date(`${date}T00:00:00.000Z`);
+    const end = new Date(`${date}T23:59:59.999Z`);
+
+    const dayLogs = await this.db
+      .select()
+      .from(attendanceLogs)
+      .where(
+        dbAnd(
+          dbEq(attendanceLogs.companyId, companyId),
+          dbGte(attendanceLogs.timestamp, start),
+          dbLte(attendanceLogs.timestamp, end),
+        ),
+      );
+
+    const totalEmployees = await this.db
+      .select()
+      .from(employees)
+      .where(dbEq(employees.companyId, companyId));
+
+    // Group by employee
+    const byEmployee = new Map<string, typeof dayLogs>();
+    for (const log of dayLogs) {
+      const key = log.zkEmployeeId.toString();
+      if (!byEmployee.has(key)) byEmployee.set(key, []);
+      byEmployee.get(key)!.push(log);
+    }
+
+    let present = 0;
+    let late = 0;
+    let totalHoursSum = 0;
+    let hoursCount = 0;
+
+    for (const [, logs] of byEmployee) {
+      const checkIn = logs.find((l) => l.eventType === 'check_in');
+      const checkOut = logs.findLast((l) => l.eventType === 'check_out');
+      if (checkIn) {
+        present++;
+        // Late if after 09:00 UTC+3 = 06:00 UTC
+        if (checkIn.timestamp.getUTCHours() >= 6) late++;
+        if (checkOut) {
+          const hours = (checkOut.timestamp.getTime() - checkIn.timestamp.getTime()) / 3600000;
+          totalHoursSum += hours;
+          hoursCount++;
+        }
+      }
+    }
+
+    const absent = Math.max(0, totalEmployees.length - present);
+    const avgHours = hoursCount > 0 ? Math.round((totalHoursSum / hoursCount) * 10) / 10 : 0;
+
+    return {
+      date,
+      totalEmployees: totalEmployees.length,
+      present,
+      absent,
+      late,
+      avgHours,
+    };
+  }
+
+  // ── Excel Export ──────────────────────────────────────────────
+
+  async exportToExcel(
+    companyId: string,
+    startDate: Date,
+    endDate: Date,
+    employeeId?: string,
+  ): Promise<Buffer> {
+    const report = await this.getAttendanceSummary(companyId, startDate, endDate, employeeId);
+
+    // Build CSV as fallback (no external dependency needed)
+    // Headers in Arabic + English
+    const headers = [
+      'اسم الموظف',
+      'التاريخ',
+      'وقت الحضور',
+      'وقت الانصراف',
+      'إجمالي الساعات',
+      'الحالة',
+    ];
+
+    const statusAr: Record<string, string> = {
+      present: 'حاضر',
+      absent: 'غائب',
+      late: 'متأخر',
+      half_day: 'نصف يوم',
+    };
+
+    const rows = report.map((r: any) => [
+      r.employeeName,
+      r.date,
+      r.checkIn ? new Date(r.checkIn).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '—',
+      r.checkOut ? new Date(r.checkOut).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '—',
+      r.totalHours !== null ? `${r.totalHours} ساعة` : '—',
+      statusAr[r.status] ?? r.status,
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    // Add UTF-8 BOM for Arabic Excel support
+    const bom = '\uFEFF';
+    return Buffer.from(bom + csvContent, 'utf8');
+  }
+
+  // ── Device Test ───────────────────────────────────────────────
+
+  async testDeviceConnection(deviceId: string, companyId: string) {
+    try {
+      const zk = await this.getZkInstance(deviceId, companyId);
+
+      // Try to fetch device info
+      const info = await new Promise<any>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('انتهت مهلة الاتصال (10 ثوانٍ)')), 10000);
+        zk.getInfo((err: Error | null, data: any) => {
+          clearTimeout(timeout);
+          if (err) reject(err);
+          else resolve(data);
+        });
+      });
+
+      return {
+        success: true,
+        message: 'تم الاتصال بنجاح',
+        deviceInfo: info,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        message: `فشل الاتصال: ${err.message}`,
+      };
+    }
+  }
 }
