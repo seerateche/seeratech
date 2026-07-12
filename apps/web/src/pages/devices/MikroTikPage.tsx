@@ -5,11 +5,13 @@ import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Router, Cpu, HardDrive, Clock, Users, Wifi, WifiOff,
-  Upload, RefreshCw, Zap, Shield, ChevronRight, X,
-  Server, Globe, Activity, MemoryStick, ActivitySquare,
+  Router, Cpu, HardDrive, Clock, Users, Wifi,
+  Upload, RefreshCw, Zap, Shield, X,
+  Server, MemoryStick, ActivitySquare,
+  UserPlus, UserX, Trash2, Edit2, Save, Plus,
+  Gauge, ArrowDownUp, Lock, Unlock,
 } from 'lucide-react';
-import { apiGet, apiPost, api, SOCKET_URL } from '../../utils/api';
+import { apiGet, apiPost, apiPut, api, SOCKET_URL } from '../../utils/api';
 import { MikroTikStats, HotspotActiveUser, HotspotProfile, MikroTikRealtimeSnapshot } from '@sira/shared';
 import toast from 'react-hot-toast';
 import { useEffect } from 'react';
@@ -40,10 +42,14 @@ function formatBytes(b: number) {
 export const MikroTikPage: React.FC = () => {
   const { deviceId } = useParams<{ deviceId: string }>();
   const qc = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'stats' | 'hotspot' | 'cpe' | 'template'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'hotspot' | 'pppoe' | 'queues' | 'cpe' | 'template'>('stats');
   const [cpeForm, setCpeForm] = useState({ cmd: 'set_ssid', ssid: '', password: '' });
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [templateName, setTemplateName] = useState('');
+  const [showPppoeModal, setShowPppoeModal] = useState(false);
+  const [pppoeForm, setPppoeForm] = useState({ deviceId: deviceId ?? '', name: '', password: '', profile: 'default', comment: '' });
+  const [showQueueModal, setShowQueueModal] = useState(false);
+  const [queueForm, setQueueForm] = useState({ deviceId: deviceId ?? '', name: '', target: '', maxLimit: '10M/10M', comment: '' });
 
   const [liveData, setLiveData] = useState<MikroTikRealtimeSnapshot | null>(null);
   const [trafficHistory, setTrafficHistory] = useState<any[]>([]);
@@ -132,8 +138,10 @@ export const MikroTikPage: React.FC = () => {
   });
 
   const TABS = [
-    { id: 'stats',    label: 'إحصائيات النظام' },
-    { id: 'hotspot',  label: 'مستخدمو الهوتسبوت' },
+    { id: 'stats',    label: 'إحصائيات' },
+    { id: 'hotspot',  label: 'الهوتسبوت' },
+    { id: 'pppoe',    label: 'PPPoE' },
+    { id: 'queues',   label: 'Queues' },
     { id: 'cpe',      label: 'إدارة CPE' },
     { id: 'template', label: 'قالب الهوتسبوت' },
   ] as const;
@@ -442,6 +450,12 @@ export const MikroTikPage: React.FC = () => {
           </div>
         )}
 
+        {/* ── PPPoE Tab ── */}
+        {activeTab === 'pppoe' && <PppoeTab deviceId={deviceId!} />}
+
+        {/* ── Queues Tab ── */}
+        {activeTab === 'queues' && <QueuesTab deviceId={deviceId!} />}
+
         {/* ── Template Upload Tab ── */}
         {activeTab === 'template' && (
           <div className="p-5 space-y-5">
@@ -450,14 +464,12 @@ export const MikroTikPage: React.FC = () => {
               ارفع ملف ZIP يحتوي على قالب صفحة الهوتسبوت (يجب أن يحتوي على login.html في الجذر).
               سيتم رفعه مباشرة إلى ذاكرة الراوتر عبر FTP وتفعيله تلقائياً.
             </div>
-
             <div className="space-y-4 max-w-md">
               <div>
                 <label className="input-label">اسم القالب</label>
                 <input className="input" placeholder="my-hotspot-template" dir="ltr"
                   value={templateName} onChange={(e) => setTemplateName(e.target.value)} />
               </div>
-
               <div>
                 <label className="input-label">ملف ZIP</label>
                 <div
@@ -495,7 +507,6 @@ export const MikroTikPage: React.FC = () => {
                   )}
                 </div>
               </div>
-
               <button
                 onClick={() => templateMutation.mutate()}
                 disabled={templateMutation.isPending || !uploadFile || !templateName}
@@ -511,6 +522,369 @@ export const MikroTikPage: React.FC = () => {
           </div>
         )}
       </div>
+    </div>
+  );
+};
+
+// ============================================================
+// PPPoE Tab Component
+// ============================================================
+const PppoeTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
+  const qc = useQueryClient();
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState({ name: '', password: '', profile: 'default', comment: '' });
+  const [search, setSearch] = useState('');
+
+  const { data: pppoeUsers = [], isLoading, refetch } = useQuery<any[]>({
+    queryKey: ['mikrotik', 'pppoe', deviceId],
+    queryFn: () => apiGet('/mikrotik/pppoe/users', { deviceId }),
+    enabled: !!deviceId,
+    refetchInterval: 15_000,
+  });
+
+  const { data: activePppoe = [] } = useQuery<any[]>({
+    queryKey: ['mikrotik', 'pppoe-active', deviceId],
+    queryFn: () => apiGet('/mikrotik/pppoe/active', { deviceId }),
+    enabled: !!deviceId,
+    refetchInterval: 10_000,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => apiPost('/mikrotik/pppoe/users', { deviceId, ...data }),
+    onSuccess: () => { toast.success('تم إنشاء المستخدم ✓'); refetch(); setShowModal(false); setForm({ name: '', password: '', profile: 'default', comment: '' }); },
+    onError: () => toast.error('فشل إنشاء المستخدم'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: ({ id }: { id: string }) =>
+      api.delete(`/api/v1/mikrotik/pppoe/users/${id}?deviceId=${deviceId}`).then(r => r.data),
+    onSuccess: () => { toast.success('تم حذف المستخدم'); refetch(); },
+    onError: () => toast.error('فشل الحذف'),
+  });
+
+  const disconnectMutation = useMutation({
+    mutationFn: (activeId: string) => apiPost('/mikrotik/pppoe/disconnect', { deviceId, activeId }),
+    onSuccess: () => { toast.success('تم قطع الاتصال'); qc.invalidateQueries({ queryKey: ['mikrotik', 'pppoe-active'] }); },
+  });
+
+  const activeMap = new Map(activePppoe.map((a: any) => [a.name, a]));
+  const filtered = pppoeUsers.filter((u: any) =>
+    !search || u.name?.toLowerCase().includes(search.toLowerCase()) || u.comment?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div>
+      {/* Stats + actions */}
+      <div className="p-4 border-b border-surface-2 flex flex-wrap items-center gap-3">
+        <div className="flex gap-4">
+          <div className="text-center">
+            <p className="text-lg font-bold font-mono text-slate-100">{pppoeUsers.length}</p>
+            <p className="text-xs text-slate-500">إجمالي المستخدمين</p>
+          </div>
+          <div className="text-center">
+            <p className="text-lg font-bold font-mono text-green-400">{activePppoe.length}</p>
+            <p className="text-xs text-slate-500">متصلون الآن</p>
+          </div>
+        </div>
+        <div className="mr-auto flex items-center gap-2">
+          <div className="relative">
+            <input
+              className="input text-sm py-1.5 pr-3 w-44"
+              placeholder="بحث بالاسم..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <button onClick={() => refetch()} className="btn-ghost btn-icon"><RefreshCw className="w-4 h-4" /></button>
+          <button onClick={() => setShowModal(true)} className="btn-primary gap-2 text-sm">
+            <UserPlus className="w-4 h-4" />إضافة مستخدم
+          </button>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="table-container">
+        <table className="sira-table">
+          <thead>
+            <tr>
+              <th>اسم المستخدم</th>
+              <th>البروفايل</th>
+              <th>التعليق</th>
+              <th>الحالة</th>
+              <th>IP</th>
+              <th>مدة الاتصال</th>
+              <th>إجراءات</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              Array.from({ length: 6 }).map((_, i) => (
+                <tr key={i}>{Array.from({ length: 7 }).map((_, j) => (
+                  <td key={j}><div className="h-4 bg-surface-2 rounded animate-pulse" /></td>
+                ))}</tr>
+              ))
+            ) : filtered.length === 0 ? (
+              <tr><td colSpan={7} className="text-center py-12 text-slate-500">
+                <Users className="w-10 h-10 mx-auto mb-2 text-slate-700" />
+                لا يوجد مستخدمون PPPoE
+              </td></tr>
+            ) : (
+              filtered.map((u: any) => {
+                const active = activeMap.get(u.name);
+                return (
+                  <tr key={u.id}>
+                    <td>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${active ? 'bg-green-400' : 'bg-slate-600'}`} />
+                        <span className="font-mono text-sm text-slate-200">{u.name}</span>
+                      </div>
+                    </td>
+                    <td><span className="text-xs text-slate-400">{u.profile}</span></td>
+                    <td><span className="text-xs text-slate-500">{u.comment || '—'}</span></td>
+                    <td>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-lg ${active ? 'bg-green-900/20 text-green-400' : 'bg-slate-800 text-slate-500'}`}>
+                        {active ? 'متصل' : 'غير متصل'}
+                      </span>
+                    </td>
+                    <td><span className="font-mono text-xs text-slate-400">{active?.address || '—'}</span></td>
+                    <td><span className="font-mono text-xs text-sira-300">{active?.uptime || '—'}</span></td>
+                    <td>
+                      <div className="flex gap-1">
+                        {active && (
+                          <button
+                            onClick={() => disconnectMutation.mutate(active.id)}
+                            className="btn-ghost btn-icon btn-sm text-amber-400 hover:text-amber-300"
+                            title="قطع الاتصال"
+                          >
+                            <UserX className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            if (confirm(`حذف المستخدم ${u.name}?`)) deleteMutation.mutate({ id: u.id });
+                          }}
+                          className="btn-ghost btn-icon btn-sm text-slate-500 hover:text-red-400"
+                          title="حذف"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Create Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-surface-1 rounded-2xl shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between p-5 border-b border-surface-2">
+              <h2 className="text-lg font-bold text-slate-100">إضافة مستخدم PPPoE</h2>
+              <button onClick={() => setShowModal(false)} className="btn-ghost btn-icon"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs text-slate-400">اسم المستخدم *</label>
+                <input className="input-field" dir="ltr" value={form.name}
+                  onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))} placeholder="client01" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-slate-400">كلمة المرور *</label>
+                <input className="input-field" type="password" value={form.password}
+                  onChange={(e) => setForm(p => ({ ...p, password: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-slate-400">البروفايل</label>
+                <input className="input-field" dir="ltr" value={form.profile}
+                  onChange={(e) => setForm(p => ({ ...p, profile: e.target.value }))} placeholder="default" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-slate-400">ملاحظة (اختياري)</label>
+                <input className="input-field" value={form.comment}
+                  onChange={(e) => setForm(p => ({ ...p, comment: e.target.value }))} placeholder="اسم العميل أو العنوان" />
+              </div>
+            </div>
+            <div className="flex gap-3 p-5 border-t border-surface-2">
+              <button onClick={() => setShowModal(false)} className="btn-secondary flex-1">إلغاء</button>
+              <button
+                onClick={() => createMutation.mutate(form)}
+                disabled={!form.name || !form.password || createMutation.isPending}
+                className="btn-primary flex-1 gap-2"
+              >
+                <Save className="w-4 h-4" />
+                {createMutation.isPending ? 'جاري الحفظ...' : 'حفظ'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================
+// Queues (Simple Queue) Tab Component
+// ============================================================
+const QueuesTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState({ name: '', target: '', maxLimit: '10M/10M', comment: '' });
+  const [search, setSearch] = useState('');
+
+  const { data: queues = [], isLoading, refetch } = useQuery<any[]>({
+    queryKey: ['mikrotik', 'queues', deviceId],
+    queryFn: () => apiGet(`/mikrotik/${deviceId}/queues`),
+    enabled: !!deviceId,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => apiPost(`/mikrotik/${deviceId}/queues`, data),
+    onSuccess: () => { toast.success('تم إنشاء Queue ✓'); refetch(); setShowModal(false); setForm({ name: '', target: '', maxLimit: '10M/10M', comment: '' }); },
+    onError: () => toast.error('فشل إنشاء Queue'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/v1/mikrotik/${deviceId}/queues/${id}`).then(r => r.data),
+    onSuccess: () => { toast.success('تم الحذف'); refetch(); },
+    onError: () => toast.error('فشل الحذف'),
+  });
+
+  const filtered = queues.filter((q: any) =>
+    !search || q.name?.toLowerCase().includes(search.toLowerCase()) || q.target?.includes(search)
+  );
+
+  // Parse maxLimit like "10M/10M" → download / upload
+  const parseLimit = (limit: string) => {
+    const [dl, ul] = (limit || '').split('/');
+    return { dl: dl || '?', ul: ul || '?' };
+  };
+
+  return (
+    <div>
+      <div className="p-4 border-b border-surface-2 flex flex-wrap items-center gap-3">
+        <div>
+          <p className="text-lg font-bold font-mono text-slate-100">{queues.length}</p>
+          <p className="text-xs text-slate-500">Simple Queues</p>
+        </div>
+        <div className="mr-auto flex items-center gap-2">
+          <input
+            className="input text-sm py-1.5 w-44"
+            placeholder="بحث بالاسم أو IP..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <button onClick={() => refetch()} className="btn-ghost btn-icon"><RefreshCw className="w-4 h-4" /></button>
+          <button onClick={() => setShowModal(true)} className="btn-primary gap-2 text-sm">
+            <Plus className="w-4 h-4" />إضافة Queue
+          </button>
+        </div>
+      </div>
+
+      <div className="table-container">
+        <table className="sira-table">
+          <thead>
+            <tr>
+              <th>الاسم</th>
+              <th>الهدف (IP)</th>
+              <th>↓ تحميل</th>
+              <th>↑ رفع</th>
+              <th>الحالة</th>
+              <th>ملاحظة</th>
+              <th>إجراءات</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i}>{Array.from({ length: 7 }).map((_, j) => (
+                  <td key={j}><div className="h-4 bg-surface-2 rounded animate-pulse" /></td>
+                ))}</tr>
+              ))
+            ) : filtered.length === 0 ? (
+              <tr><td colSpan={7} className="text-center py-12 text-slate-500">
+                <Gauge className="w-10 h-10 mx-auto mb-2 text-slate-700" />
+                لا توجد Queues مضبوطة
+              </td></tr>
+            ) : (
+              filtered.map((q: any) => {
+                const { dl, ul } = parseLimit(q.maxLimit || q['max-limit'] || '');
+                const disabled = q.disabled === 'true' || q.disabled === true;
+                return (
+                  <tr key={q.id}>
+                    <td><span className="font-mono text-sm text-slate-200">{q.name}</span></td>
+                    <td><span className="font-mono text-xs text-blue-300">{q.target || q['target-addresses'] || '—'}</span></td>
+                    <td><span className="text-sm text-green-400 font-mono">{dl}</span></td>
+                    <td><span className="text-sm text-amber-400 font-mono">{ul}</span></td>
+                    <td>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-lg ${disabled ? 'bg-red-900/20 text-red-400' : 'bg-green-900/20 text-green-400'}`}>
+                        {disabled ? 'معطل' : 'نشط'}
+                      </span>
+                    </td>
+                    <td><span className="text-xs text-slate-500">{q.comment || '—'}</span></td>
+                    <td>
+                      <button
+                        onClick={() => { if (confirm(`حذف Queue ${q.name}?`)) deleteMutation.mutate(q.id); }}
+                        className="btn-ghost btn-icon btn-sm text-slate-500 hover:text-red-400"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Create Queue Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-surface-1 rounded-2xl shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between p-5 border-b border-surface-2">
+              <h2 className="text-lg font-bold text-slate-100">إضافة Simple Queue</h2>
+              <button onClick={() => setShowModal(false)} className="btn-ghost btn-icon"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs text-slate-400">الاسم *</label>
+                <input className="input-field" dir="ltr" value={form.name}
+                  onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Client_192.168.1.10" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-slate-400">IP الهدف *</label>
+                <input className="input-field" dir="ltr" value={form.target}
+                  onChange={(e) => setForm(p => ({ ...p, target: e.target.value }))} placeholder="192.168.1.10" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-slate-400">الحد الأقصى (تحميل/رفع)</label>
+                <input className="input-field" dir="ltr" value={form.maxLimit}
+                  onChange={(e) => setForm(p => ({ ...p, maxLimit: e.target.value }))} placeholder="10M/10M" />
+                <p className="text-xs text-slate-600">مثال: 20M/5M = 20 Mbps تحميل / 5 Mbps رفع</p>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-slate-400">ملاحظة</label>
+                <input className="input-field" value={form.comment}
+                  onChange={(e) => setForm(p => ({ ...p, comment: e.target.value }))} placeholder="اسم العميل" />
+              </div>
+            </div>
+            <div className="flex gap-3 p-5 border-t border-surface-2">
+              <button onClick={() => setShowModal(false)} className="btn-secondary flex-1">إلغاء</button>
+              <button
+                onClick={() => createMutation.mutate(form)}
+                disabled={!form.name || !form.target || createMutation.isPending}
+                className="btn-primary flex-1 gap-2"
+              >
+                <Save className="w-4 h-4" />
+                {createMutation.isPending ? 'جاري الحفظ...' : 'حفظ'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

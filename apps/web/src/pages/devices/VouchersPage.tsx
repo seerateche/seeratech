@@ -29,7 +29,10 @@ export const VouchersPage: React.FC = () => {
   const [showGenerate, setShowGenerate] = useState(false);
   const [genForm, setGenForm] = useState({
     deviceId: '', profileName: '', count: 10,
-    prefix: 'SIRA', batchName: '', comment: '',
+    prefix: '', batchName: '', comment: '',
+    usernameLength: 8, separateCredentials: false,
+    timeLimitValue: '', timeLimitUnit: 'd',
+    dataLimitValue: '', dataLimitUnit: 'GB'
   });
 
   const { data: batches = [], isLoading: batchesLoading, refetch: refetchBatches } = useQuery<VoucherBatchSummary[]>({
@@ -51,12 +54,31 @@ export const VouchersPage: React.FC = () => {
   const mikrotikDevices = devices.filter((d) => d.type === DeviceType.MIKROTIK);
 
   const generateMutation = useMutation({
-    mutationFn: (data: typeof genForm) => apiPost('/vouchers/generate', data),
+    mutationFn: (data: typeof genForm) => {
+      const payload: any = {
+        deviceId: data.deviceId,
+        profileName: data.profileName,
+        count: data.count,
+        prefix: data.prefix,
+        batchName: data.batchName,
+        comment: data.comment,
+        usernameLength: data.usernameLength,
+        separateCredentials: data.separateCredentials,
+      };
+      if (data.timeLimitValue) payload.timeLimit = `${data.timeLimitValue}${data.timeLimitUnit}`;
+      if (data.dataLimitValue) payload.dataLimitMb = data.dataLimitUnit === 'GB' ? Number(data.dataLimitValue) * 1024 : Number(data.dataLimitValue);
+      
+      return apiPost('/vouchers/generate', payload);
+    },
     onSuccess: (result: any) => {
       toast.success(`✓ تم توليد ${result.vouchers?.length} بطاقة ورفعها للراوتر`);
       qc.invalidateQueries({ queryKey: ['vouchers'] });
       setShowGenerate(false);
-      setGenForm({ deviceId: '', profileName: '', count: 10, prefix: 'SIRA', batchName: '', comment: '' });
+      setGenForm({ 
+        deviceId: '', profileName: '', count: 10, prefix: '', batchName: '', comment: '',
+        usernameLength: 8, separateCredentials: false,
+        timeLimitValue: '', timeLimitUnit: 'd', dataLimitValue: '', dataLimitUnit: 'GB'
+      });
     },
   });
 
@@ -285,7 +307,7 @@ export const VouchersPage: React.FC = () => {
 
             <div className="space-y-4">
               <div>
-                <label className="input-label">الراوتر</label>
+                <label className="input-label">الراوتر *</label>
                 <select
                   className="input"
                   value={genForm.deviceId}
@@ -300,7 +322,30 @@ export const VouchersPage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="input-label">اسم البروفايل</label>
+                  <label className="input-label">اسم الدفعة *</label>
+                  <input
+                    className="input"
+                    placeholder="مثال: يناير 2025"
+                    value={genForm.batchName}
+                    onChange={(e) => setGenForm({ ...genForm, batchName: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="input-label">إجمالي عدد الكروت *</label>
+                  <input
+                    type="number"
+                    className="input"
+                    min={1}
+                    max={5000}
+                    value={genForm.count}
+                    onChange={(e) => setGenForm({ ...genForm, count: +e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="input-label">اسم البروفايل *</label>
                   <input
                     className="input"
                     placeholder="default"
@@ -310,21 +355,49 @@ export const VouchersPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="input-label">عدد البطاقات</label>
-                  <input
-                    type="number"
-                    className="input"
-                    min={1}
-                    max={500}
-                    value={genForm.count}
-                    onChange={(e) => setGenForm({ ...genForm, count: +e.target.value })}
-                  />
+                  <label className="input-label">تحديد وقت المستخدم (اختياري)</label>
+                  <div className="flex gap-1">
+                    <input
+                      type="number" min={1} className="input w-full" placeholder="30"
+                      value={genForm.timeLimitValue}
+                      onChange={(e) => setGenForm({ ...genForm, timeLimitValue: e.target.value })}
+                    />
+                    <select className="input w-20 px-1" value={genForm.timeLimitUnit} onChange={(e) => setGenForm({ ...genForm, timeLimitUnit: e.target.value })}>
+                      <option value="d">يوم</option>
+                      <option value="h">ساعة</option>
+                      <option value="m">دقيقة</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="input-label">البادئة</label>
+                  <label className="input-label">حجم الكوتة (اختياري)</label>
+                  <div className="flex gap-1">
+                    <input
+                      type="number" min={1} className="input w-full" placeholder="10"
+                      value={genForm.dataLimitValue}
+                      onChange={(e) => setGenForm({ ...genForm, dataLimitValue: e.target.value })}
+                    />
+                    <select className="input w-20 px-1" value={genForm.dataLimitUnit} onChange={(e) => setGenForm({ ...genForm, dataLimitUnit: e.target.value })}>
+                      <option value="GB">GB</option>
+                      <option value="MB">MB</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="input-label">نوع طباعة المستخدم</label>
+                  <select className="input" value={genForm.separateCredentials ? 'true' : 'false'} onChange={(e) => setGenForm({ ...genForm, separateCredentials: e.target.value === 'true' })}>
+                    <option value="false">كود واحد (يوزر=باسورد)</option>
+                    <option value="true">يوزر وباسورد منفصلين</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="input-label">بادئة لاسم المستخدم (اختياري)</label>
                   <input
                     className="input"
                     placeholder="SIRA"
@@ -334,21 +407,20 @@ export const VouchersPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="input-label">اسم الدفعة</label>
+                  <label className="input-label">عدد حروف المستخدم</label>
                   <input
-                    className="input"
-                    placeholder="مثال: يناير 2025"
-                    value={genForm.batchName}
-                    onChange={(e) => setGenForm({ ...genForm, batchName: e.target.value })}
+                    type="number" min={4} max={16} className="input"
+                    value={genForm.usernameLength}
+                    onChange={(e) => setGenForm({ ...genForm, usernameLength: +e.target.value })}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="input-label">ملاحظة (اختياري)</label>
+                <label className="input-label">تعليق (اختياري)</label>
                 <input
                   className="input"
-                  placeholder="مثال: بطاقات VIP"
+                  placeholder="ادخل تعليقا للملف"
                   value={genForm.comment}
                   onChange={(e) => setGenForm({ ...genForm, comment: e.target.value })}
                 />

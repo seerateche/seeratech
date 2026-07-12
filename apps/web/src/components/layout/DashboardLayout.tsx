@@ -5,7 +5,7 @@
 import React, { useState, useCallback } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, Router, Ticket, Camera,
+  LayoutDashboard, Router, Ticket, Camera, Printer,
   Shield, ChevronLeft, ChevronRight, Bell, LogOut,
   Activity, Wifi, Crown, Menu, X, Fingerprint, Globe, KeyRound, Wallet,
   Tag
@@ -28,7 +28,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'وضع المدير العام', labelShort: 'God Mode', icon: Crown,           to: '/god-mode',   superAdminOnly: true },
   { label: 'لوحة التحكم',      labelShort: 'الرئيسية', icon: LayoutDashboard, to: '/dashboard' },
   { label: 'الأجهزة',          labelShort: 'الأجهزة',  icon: Router,           to: '/devices' },
-  { label: 'بطاقات الإنترنت',  labelShort: 'البطاقات', icon: Ticket,           to: '/vouchers' },
+  { label: 'إنشاء بطاقات',     labelShort: 'إنشاء كروت',icon: Ticket,          to: '/vouchers' },
+  { label: 'طباعة البطاقات',   labelShort: 'طباعة كروت',icon: Printer,         to: '/print-cards' },
   { label: 'كاميرات المراقبة', labelShort: 'CCTV',     icon: Camera,           to: '/cctv' },
   { label: 'البصمة والحضور',   labelShort: 'الحضور',   icon: Fingerprint,      to: '/attendance' },
   { label: 'الحسابات والفواتير',labelShort: 'الحسابات', icon: Wallet,          to: '/billing' },

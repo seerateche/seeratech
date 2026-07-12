@@ -23,6 +23,7 @@ import { CompanyDashboard } from './pages/company/CompanyDashboard';
 import { DevicesPage }      from './pages/devices/DevicesPage';
 import { MikroTikPage }     from './pages/devices/MikroTikPage';
 import { VouchersPage }     from './pages/devices/VouchersPage';
+import { PrintCardsPage }   from './pages/devices/PrintCardsPage';
 import { AttendancePage }   from './pages/devices/AttendancePage';
 import { CctvPage }         from './pages/devices/CctvPage';
 import { IspQuotaView }     from './pages/isp/IspQuotaView';
@@ -101,6 +102,7 @@ const router = createHashRouter([
       { path: 'devices',                    element: <DevicesPage /> },
       { path: 'devices/:deviceId/mikrotik', element: <MikroTikPage /> },
       { path: 'vouchers',                   element: <VouchersPage /> },
+      { path: 'print-cards',                element: <PrintCardsPage /> },
       { path: 'attendance',                 element: <AttendancePage /> },
       { path: 'cctv',                       element: <CctvPage /> },
       { path: 'isp-quota',                  element: <IspQuotaView /> },
