@@ -29,7 +29,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'لوحة التحكم',      labelShort: 'الرئيسية', icon: LayoutDashboard, to: '/dashboard' },
   { label: 'الأجهزة',          labelShort: 'الأجهزة',  icon: Router,           to: '/devices' },
   { label: 'إنشاء بطاقات',     labelShort: 'إنشاء كروت',icon: Ticket,          to: '/vouchers' },
-  { label: 'طباعة البطاقات',   labelShort: 'طباعة كروت',icon: Printer,         to: '/print-cards' },
+  { label: 'تصميم وإنشاء الكروت',labelShort: 'تصميم',   icon: Printer,         to: '/card-making' },
   { label: 'كاميرات المراقبة', labelShort: 'CCTV',     icon: Camera,           to: '/cctv' },
   { label: 'البصمة والحضور',   labelShort: 'الحضور',   icon: Fingerprint,      to: '/attendance' },
   { label: 'الحسابات والفواتير',labelShort: 'الحسابات', icon: Wallet,          to: '/billing' },
