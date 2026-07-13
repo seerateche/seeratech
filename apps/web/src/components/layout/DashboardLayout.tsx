@@ -133,17 +133,20 @@ export const DashboardLayout: React.FC<Props> = ({ children }) => {
           <LogOut className="w-5 h-5 flex-shrink-0" />
           {(!collapsed || inDrawer) && <span>تسجيل الخروج</span>}
         </button>
-        <button
-          onClick={() => {
-            if (inDrawer) closeDrawer();
-            setShowChangePassword(true);
-          }}
-          className={`nav-item w-full text-slate-400 hover:text-slate-300 hover:bg-surface-2 mt-1
-                      ${(!collapsed || inDrawer) ? '' : 'justify-center px-2'}`}
-        >
-          <KeyRound className="w-5 h-5 flex-shrink-0" />
-          {(!collapsed || inDrawer) && <span>تغيير كلمة المرور</span>}
-        </button>
+        {/* تغيير كلمة المرور — للمدير العام فقط */}
+        {isSuperAdmin && (
+          <button
+            onClick={() => {
+              if (inDrawer) closeDrawer();
+              setShowChangePassword(true);
+            }}
+            className={`nav-item w-full text-slate-400 hover:text-slate-300 hover:bg-surface-2 mt-1
+                        ${(!collapsed || inDrawer) ? '' : 'justify-center px-2'}`}
+          >
+            <KeyRound className="w-5 h-5 flex-shrink-0" />
+            {(!collapsed || inDrawer) && <span>تغيير كلمة المرور</span>}
+          </button>
+        )}
       </div>
 
       {/* Desktop collapse toggle */}

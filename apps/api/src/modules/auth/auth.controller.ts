@@ -26,9 +26,9 @@ import {
   IsString,
   MinLength,
 } from 'class-validator';
-import { AuthService, JwtAuthGuard, Public } from './auth.service';
+import { AuthService, JwtAuthGuard, Public, RolesGuard, Roles } from './auth.service';
 import { CurrentUser } from '../../common/current-user.decorator';
-import { AuthTokenPayload } from '@sira/shared';
+import { AuthTokenPayload, UserRole } from '@sira/shared';
 
 // ── Request DTOs ──────────────────────────────────────────────
 
@@ -235,10 +235,11 @@ export class AuthController {
     return { loggedOut: true };
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN)
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Change current user password' })
+  @ApiOperation({ summary: 'Change current user password — Super Admin only' })
   async changePassword(
     @CurrentUser('sub') userId: string,
     @Body() body: ChangePasswordBody,
