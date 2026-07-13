@@ -51,7 +51,7 @@ export const AddExpenseModal: React.FC<Props> = ({ onClose }) => {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
-      <div className="w-full max-w-lg bg-surface-1 rounded-2xl shadow-xl overflow-hidden flex flex-col">
+      <div className="w-full max-w-lg bg-surface-1 rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between p-6 border-b border-surface-2 shrink-0">
           <h2 className="text-xl font-bold text-slate-100">تسجيل مصروف جديد</h2>
           <button onClick={onClose} className="btn-ghost btn-icon" disabled={mutation.isPending}>
@@ -59,7 +59,7 @@ export const AddExpenseModal: React.FC<Props> = ({ onClose }) => {
           </button>
         </div>
 
-        <div className="p-6">
+        <div className="p-6 overflow-y-auto">
           <form id="expense-form" onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-1">
               <label className="text-sm font-medium text-slate-300">تصنيف المصروف *</label>

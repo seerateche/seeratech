@@ -8,7 +8,7 @@ export const InvoicesPage: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const { data: invoices = [], isLoading } = useQuery({
+  const { data: invoices = [], isLoading } = useQuery<any[]>({
     queryKey: ['billing', 'invoices'],
     queryFn: () => apiGet('/billing/invoices'),
   });
@@ -20,13 +20,13 @@ export const InvoicesPage: React.FC = () => {
   );
 
   return (
-    <div className="flex-1 p-6 lg:p-8 ml-64 flex flex-col gap-6">
+    <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100 mb-1">الفواتير</h1>
-          <p className="text-slate-400">إدارة فواتير العملاء والتحصيلات</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-100 mb-1">الفواتير</h1>
+          <p className="text-sm sm:text-base text-slate-400">إدارة فواتير العملاء والتحصيلات</p>
         </div>
-        <button onClick={() => setIsAddModalOpen(true)} className="btn-primary shrink-0">
+        <button onClick={() => setIsAddModalOpen(true)} className="btn-primary shrink-0 w-full sm:w-auto justify-center">
           <Plus className="w-4 h-4 mr-2" />
           إنشاء فاتورة جديدة
         </button>
