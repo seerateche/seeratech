@@ -183,7 +183,8 @@
   .btn-icon    { @apply btn p-0 justify-center; width: 44px; height: 44px; }
 
   /* ── Input — VISIBLE text for mobile (no password masking style here) ── */
-  .input {
+  .input,
+  .input-field {
     @apply w-full bg-surface/50 backdrop-blur-sm border border-surface-2/50 rounded-lg px-3 py-3
            text-slate-100 placeholder-slate-500
            focus:outline-none focus:border-sira-500 focus:ring-1 focus:ring-sira-500

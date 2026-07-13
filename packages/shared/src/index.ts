@@ -171,7 +171,13 @@ export interface VoucherRecord {
   usedBy?: string;
   usedAt?: string;
   expiresAt?: string;
+  createdAt?: string;
   companyId: string;
+  /** Data limit label shown on the printed card (e.g. "10GB"). */
+  dataLimit?: string;
+  /** Live usage counters synced from the router (bytes). */
+  bytesIn?: number;
+  bytesOut?: number;
 }
 
 export interface VoucherBatchSummary {

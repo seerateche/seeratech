@@ -5,16 +5,16 @@ import { apiGet } from '../../utils/api';
 import { Link } from 'react-router-dom';
 
 export const BillingDashboard: React.FC = () => {
-  const { data: summary, isLoading } = useQuery({
+  const { data: summary, isLoading } = useQuery<any>({
     queryKey: ['billing', 'summary'],
     queryFn: () => apiGet('/billing/summary'),
   });
 
   if (isLoading) {
     return (
-      <div className="flex-1 p-6 lg:p-8 ml-64 flex flex-col gap-6 animate-pulse">
+      <div className="space-y-6 animate-pulse">
         <div className="h-10 w-48 bg-surface-2 rounded-lg" />
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map(i => <div key={i} className="card h-32" />)}
         </div>
       </div>
@@ -26,19 +26,19 @@ export const BillingDashboard: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 p-6 lg:p-8 ml-64 flex flex-col gap-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100 mb-1">الماليات والفواتير</h1>
-          <p className="text-slate-400">ملخص حسابات وإيرادات الشبكة</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-100 mb-1">الماليات والفواتير</h1>
+          <p className="text-sm sm:text-base text-slate-400">ملخص حسابات وإيرادات الشبكة</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Link to="/billing/invoices" className="btn-primary gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link to="/billing/invoices" className="btn-primary gap-2 flex-1 sm:flex-none justify-center">
             <FileText className="w-4 h-4" />
             فواتير العملاء
           </Link>
-          <Link to="/billing/expenses" className="btn-secondary gap-2">
+          <Link to="/billing/expenses" className="btn-secondary gap-2 flex-1 sm:flex-none justify-center">
             <TrendingDown className="w-4 h-4 text-red-400" />
             منصرفات
           </Link>
@@ -46,7 +46,7 @@ export const BillingDashboard: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="card p-5 border-emerald-500/30 bg-emerald-900/10 relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-10 text-emerald-400 pointer-events-none">
             <TrendingUp className="w-16 h-16" />
@@ -57,7 +57,7 @@ export const BillingDashboard: React.FC = () => {
             </div>
             <h3 className="font-semibold text-emerald-100">إجمالي الإيرادات</h3>
           </div>
-          <p className="text-3xl font-bold text-emerald-400 font-mono" dir="ltr">
+          <p className="text-2xl sm:text-3xl font-bold text-emerald-400 font-mono" dir="ltr">
             {formatMoney(summary?.revenue || 0)}
           </p>
         </div>
@@ -72,7 +72,7 @@ export const BillingDashboard: React.FC = () => {
             </div>
             <h3 className="font-semibold text-red-100">إجمالي المصروفات</h3>
           </div>
-          <p className="text-3xl font-bold text-red-400 font-mono" dir="ltr">
+          <p className="text-2xl sm:text-3xl font-bold text-red-400 font-mono" dir="ltr">
             {formatMoney(summary?.expenses || 0)}
           </p>
         </div>
@@ -87,7 +87,7 @@ export const BillingDashboard: React.FC = () => {
             </div>
             <h3 className="font-semibold text-blue-100">صافي الأرباح</h3>
           </div>
-          <p className="text-3xl font-bold text-blue-400 font-mono" dir="ltr">
+          <p className="text-2xl sm:text-3xl font-bold text-blue-400 font-mono" dir="ltr">
             {formatMoney(summary?.netProfit || 0)}
           </p>
         </div>
@@ -102,7 +102,7 @@ export const BillingDashboard: React.FC = () => {
             </div>
             <h3 className="font-semibold text-rose-100">رصيد فودافون كاش</h3>
           </div>
-          <p className="text-3xl font-bold text-rose-400 font-mono" dir="ltr">
+          <p className="text-2xl sm:text-3xl font-bold text-rose-400 font-mono" dir="ltr">
             {formatMoney(summary?.vfCashBalance || 0)}
           </p>
         </div>

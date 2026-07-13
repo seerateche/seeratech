@@ -7,19 +7,19 @@ import { AddQuotationModal } from './AddQuotationModal';
 export const QuotationsPage: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   
-  const { data: quotations, isLoading } = useQuery({
+  const { data: quotations = [], isLoading } = useQuery<any[]>({
     queryKey: ['billing', 'quotations'],
     queryFn: () => apiGet('/billing/quotations'),
   });
 
   return (
-    <div className="flex-1 p-6 lg:p-8 ml-64 flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100 mb-1">عروض الأسعار</h1>
-          <p className="text-slate-400">إنشاء وإدارة عروض أسعار للعملاء</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-100 mb-1">عروض الأسعار</h1>
+          <p className="text-sm sm:text-base text-slate-400">إنشاء وإدارة عروض أسعار للعملاء</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="btn-primary">
+        <button onClick={() => setShowModal(true)} className="btn-primary w-full sm:w-auto justify-center">
           <Plus className="w-4 h-4 mr-2" />
           إنشاء عرض سعر
         </button>
@@ -30,7 +30,7 @@ export const QuotationsPage: React.FC = () => {
           <div className="h-16 bg-surface-2 rounded-xl w-full" />
           <div className="h-16 bg-surface-2 rounded-xl w-full" />
         </div>
-      ) : quotations?.length > 0 ? (
+      ) : quotations.length > 0 ? (
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-right">

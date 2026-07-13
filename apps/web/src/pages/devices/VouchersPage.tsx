@@ -1,12 +1,13 @@
 // ============================================================
-// SIRA PLATFORM v4 - Vouchers Page (Hotspot Cards Engine)
+// SEERA PLATFORM v4 - Vouchers Page (Hotspot Cards Engine)
+// Unified: generate real vouchers on the router + design & print
+// (merged the old CardMakingPage design panel into this page)
 // ============================================================
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Ticket, Plus, Download, RefreshCw, Printer,
-  CheckCircle2, Clock, XCircle, Filter, Search,
-  Trash2, Upload, ChevronDown, BarChart3,
+  Search, BarChart3, Wifi, LayoutGrid, X,
 } from 'lucide-react';
 import { apiGet, apiPost, api } from '../../utils/api';
 import {
@@ -21,12 +22,55 @@ const STATUS_CONFIG: Record<VoucherStatus, { label: string; className: string }>
   disabled: { label: 'معطلة',       className: 'badge-offline' },
 };
 
+// ── Card design defaults (merged from CardMakingPage) ─────────
+interface CardDesign {
+  columns: number;
+  printType: 'code_only' | 'username_password';
+  fontSize: number;
+  textColor: string;
+  margin: number;
+  showSerial: boolean;
+  cardBorder: boolean;
+  showQr: boolean;
+  companyName: string;
+}
+
+const DEFAULT_DESIGN: CardDesign = {
+  columns: 3,
+  printType: 'code_only',
+  fontSize: 20,
+  textColor: '#000000',
+  margin: 4,
+  showSerial: false,
+  cardBorder: true,
+  showQr: false,
+  companyName: 'إنترنت هوت سبوت',
+};
+
+// Injected only while printing so the on-screen layout is untouched.
+const buildPrintStyle = (cols: number, marginPx: number) => `
+@media print {
+  body * { visibility: hidden !important; }
+  #print-area, #print-area * { visibility: visible !important; }
+  #print-area {
+    position: absolute; left: 0; top: 0; width: 100%;
+    display: grid;
+    grid-template-columns: repeat(${cols}, 1fr);
+    gap: ${marginPx}px;
+    padding: 8mm;
+  }
+  @page { margin: 8mm; size: A4; }
+}
+`;
+
 export const VouchersPage: React.FC = () => {
   const qc = useQueryClient();
   const [selectedBatch, setSelectedBatch] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<VoucherStatus | 'all'>('all');
   const [search, setSearch] = useState('');
   const [showGenerate, setShowGenerate] = useState(false);
+  const [showDesign, setShowDesign] = useState(false);
+  const [design, setDesign] = useState<CardDesign>(DEFAULT_DESIGN);
   const [genForm, setGenForm] = useState({
     deviceId: '', profileName: '', count: 10,
     prefix: '', batchName: '', comment: '',
@@ -35,7 +79,7 @@ export const VouchersPage: React.FC = () => {
     dataLimitValue: '', dataLimitUnit: 'GB'
   });
 
-  const { data: batches = [], isLoading: batchesLoading, refetch: refetchBatches } = useQuery<VoucherBatchSummary[]>({
+  const { data: batches = [] } = useQuery<VoucherBatchSummary[]>({
     queryKey: ['vouchers', 'batches'],
     queryFn: () => apiGet('/vouchers/batches'),
   });
@@ -67,19 +111,20 @@ export const VouchersPage: React.FC = () => {
       };
       if (data.timeLimitValue) payload.timeLimit = `${data.timeLimitValue}${data.timeLimitUnit}`;
       if (data.dataLimitValue) payload.dataLimitMb = data.dataLimitUnit === 'GB' ? Number(data.dataLimitValue) * 1024 : Number(data.dataLimitValue);
-      
+
       return apiPost('/vouchers/generate', payload);
     },
     onSuccess: (result: any) => {
       toast.success(`✓ تم توليد ${result.vouchers?.length} بطاقة ورفعها للراوتر`);
       qc.invalidateQueries({ queryKey: ['vouchers'] });
       setShowGenerate(false);
-      setGenForm({ 
+      setGenForm({
         deviceId: '', profileName: '', count: 10, prefix: '', batchName: '', comment: '',
         usernameLength: 8, separateCredentials: false,
         timeLimitValue: '', timeLimitUnit: 'd', dataLimitValue: '', dataLimitUnit: 'GB'
       });
     },
+    onError: () => toast.error('فشل توليد البطاقات — تأكد من اتصال الراوتر'),
   });
 
   const syncMutation = useMutation({
@@ -88,6 +133,7 @@ export const VouchersPage: React.FC = () => {
       toast.success('تم مزامنة حالة البطاقات');
       qc.invalidateQueries({ queryKey: ['vouchers'] });
     },
+    onError: () => toast.error('فشل المزامنة'),
   });
 
   const exportPdf = async (batchId?: string) => {
@@ -115,6 +161,23 @@ export const VouchersPage: React.FC = () => {
 
   const activeBatch = batches.find((b) => b.batchId === selectedBatch);
 
+  // Cards to print: current filtered list (real vouchers only — no fake data)
+  const printableCards = filtered;
+
+  const handlePrint = () => {
+    if (printableCards.length === 0) {
+      toast.error('لا توجد بطاقات للطباعة — ولّد دفعة أولاً');
+      return;
+    }
+    const style = document.createElement('style');
+    style.innerHTML = buildPrintStyle(design.columns, design.margin * 10);
+    document.head.appendChild(style);
+    window.print();
+    setTimeout(() => {
+      if (document.head.contains(style)) document.head.removeChild(style);
+    }, 1500);
+  };
+
   return (
     <div className="space-y-4 animate-fade-in">
       {/* Header */}
@@ -124,11 +187,11 @@ export const VouchersPage: React.FC = () => {
             <Ticket className="w-5 h-5 text-blue-400" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-100">بطاقات الإنترنت</h1>
-            <p className="text-sm text-slate-500">إدارة كروت الهوتسبوت المباشرة</p>
+            <h1 className="text-xl font-bold text-slate-100">إنشاء البطاقات</h1>
+            <p className="text-sm text-slate-500">توليد وتصميم وطباعة كروت الهوتسبوت</p>
           </div>
         </div>
-        <div className="mr-auto flex items-center gap-2">
+        <div className="mr-auto flex items-center gap-2 flex-wrap">
           <button
             onClick={() => syncMutation.mutate(mikrotikDevices[0]?.id)}
             disabled={syncMutation.isPending || !mikrotikDevices[0]}
@@ -141,6 +204,10 @@ export const VouchersPage: React.FC = () => {
             <Download className="w-4 h-4" />
             PDF
           </button>
+          <button onClick={() => setShowDesign(true)} className="btn-secondary gap-2">
+            <LayoutGrid className="w-4 h-4" />
+            تصميم وطباعة
+          </button>
           <button onClick={() => setShowGenerate(true)} className="btn-primary gap-2">
             <Plus className="w-4 h-4" />
             توليد دفعة
@@ -150,7 +217,7 @@ export const VouchersPage: React.FC = () => {
 
       {/* Stats row */}
       {activeBatch && (
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { label: 'الإجمالي', value: activeBatch.total, color: 'text-slate-200' },
             { label: 'غير مستخدمة', value: activeBatch.unused, color: 'text-green-400' },
@@ -201,7 +268,7 @@ export const VouchersPage: React.FC = () => {
         <div className="lg:col-span-3 card">
           <div className="card-header gap-3 flex-wrap">
             {/* Status filter */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 flex-wrap">
               {(['all', VoucherStatus.UNUSED, VoucherStatus.ACTIVE, VoucherStatus.EXPIRED, VoucherStatus.DISABLED] as Array<VoucherStatus | 'all'>).map((s) => (
                 <button
                   key={s}
@@ -299,7 +366,7 @@ export const VouchersPage: React.FC = () => {
       {showGenerate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowGenerate(false)} />
-          <div className="relative card w-full max-w-md p-6 animate-slide-in-up">
+          <div className="relative card w-full max-w-md p-6 animate-slide-in-up max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-slate-100 mb-5 flex items-center gap-2">
               <Plus className="w-5 h-5 text-sira-400" />
               توليد دفعة بطاقات جديدة
@@ -447,6 +514,175 @@ export const VouchersPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Design & Print Modal (merged from CardMakingPage) */}
+      {showDesign && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowDesign(false)} />
+          <div className="relative card w-full max-w-4xl p-0 animate-slide-in-up max-h-[92vh] overflow-hidden flex flex-col">
+            <div className="card-header flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                <LayoutGrid className="w-5 h-5 text-indigo-400" />
+                تصميم وطباعة الكروت
+              </h3>
+              <button onClick={() => setShowDesign(false)} className="text-slate-400 hover:text-slate-200">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex flex-col lg:flex-row gap-5 p-5 overflow-y-auto">
+              {/* Live preview */}
+              <div className="flex-1 flex flex-col items-center justify-start">
+                <p className="text-xs text-slate-500 mb-3">معاينة الكارت</p>
+                <div
+                  className="relative bg-white shadow-xl"
+                  style={{
+                    border: design.cardBorder ? '2px solid #cbd5e1' : 'none',
+                    borderRadius: '12px', padding: '20px',
+                    width: '260px', minHeight: '150px',
+                  }}
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold' }}>
+                      {design.companyName}
+                    </span>
+                    <Wifi className="w-5 h-5 text-indigo-500" />
+                  </div>
+                  <div className="text-center space-y-2 mb-4">
+                    {design.printType === 'username_password' ? (
+                      <>
+                        <div style={{ fontSize: `${design.fontSize}px`, color: design.textColor, fontWeight: 'bold' }}>USER123</div>
+                        <div style={{ fontSize: `${design.fontSize}px`, color: design.textColor, fontWeight: 'bold' }}>PASS456</div>
+                      </>
+                    ) : (
+                      <div style={{ fontSize: `${design.fontSize}px`, color: design.textColor, fontWeight: 'bold', letterSpacing: '2px' }}>CODE789</div>
+                    )}
+                  </div>
+                  <div className="flex justify-between items-end border-t border-slate-100 pt-3">
+                    <div className="text-[10px] text-slate-400">معاينة</div>
+                    {design.showQr && (
+                      <div className="w-12 h-12 bg-slate-200 rounded flex items-center justify-center">
+                        <span className="text-[8px] text-slate-500">QR</span>
+                      </div>
+                    )}
+                  </div>
+                  {design.showSerial && (
+                    <div style={{ position: 'absolute', bottom: '8px', left: '12px', fontSize: '8px', color: '#94a3b8' }}>
+                      SN: 100000001
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-4 text-center">
+                  {printableCards.length > 0
+                    ? `${printableCards.length} بطاقة جاهزة للطباعة`
+                    : 'لا توجد بطاقات — ولّد دفعة أولاً'}
+                </p>
+              </div>
+
+              {/* Design settings */}
+              <div className="w-full lg:w-[340px] space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="input-label">عدد الأعمدة</label>
+                    <input type="number" min={1} max={8} className="input"
+                      value={design.columns} onChange={(e) => setDesign({ ...design, columns: +e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="input-label">حجم الخط</label>
+                    <input type="number" min={8} max={40} className="input"
+                      value={design.fontSize} onChange={(e) => setDesign({ ...design, fontSize: +e.target.value })} />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="input-label">نوع الطباعة</label>
+                  <select className="input" value={design.printType}
+                    onChange={(e) => setDesign({ ...design, printType: e.target.value as CardDesign['printType'] })}>
+                    <option value="code_only">كود فقط</option>
+                    <option value="username_password">يوزر وباسورد</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="input-label">اسم الشركة على الكارت</label>
+                  <input className="input" value={design.companyName}
+                    onChange={(e) => setDesign({ ...design, companyName: e.target.value })} />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="input-label">الهامش بين الكروت</label>
+                    <input type="number" min={0} max={20} className="input"
+                      value={design.margin} onChange={(e) => setDesign({ ...design, margin: +e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="input-label">لون الخط</label>
+                    <input type="color" className="input h-[42px] p-1 cursor-pointer"
+                      value={design.textColor} onChange={(e) => setDesign({ ...design, textColor: e.target.value })} />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-4 pt-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-300">
+                    <input type="checkbox" className="w-4 h-4 rounded" checked={design.cardBorder}
+                      onChange={(e) => setDesign({ ...design, cardBorder: e.target.checked })} />
+                    إطار للكارت
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-300">
+                    <input type="checkbox" className="w-4 h-4 rounded" checked={design.showSerial}
+                      onChange={(e) => setDesign({ ...design, showSerial: e.target.checked })} />
+                    إظهار السيريال
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-300">
+                    <input type="checkbox" className="w-4 h-4 rounded" checked={design.showQr}
+                      onChange={(e) => setDesign({ ...design, showQr: e.target.checked })} />
+                    إظهار QR
+                  </label>
+                </div>
+
+                <button
+                  onClick={handlePrint}
+                  disabled={printableCards.length === 0}
+                  className="btn-primary w-full justify-center gap-2 mt-2"
+                >
+                  <Printer className="w-4 h-4" />
+                  طباعة ({printableCards.length} بطاقة)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden print area — real vouchers only */}
+      <div id="print-area" className="hidden">
+        {printableCards.map((card) => (
+          <div
+            key={card.id}
+            style={{
+              border: design.cardBorder ? '2px solid #cbd5e1' : 'none',
+              borderRadius: '12px', padding: '16px',
+              backgroundColor: '#ffffff', position: 'relative',
+              fontFamily: 'system-ui, sans-serif',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'bold' }}>{design.companyName}</span>
+              <span style={{ fontSize: '10px', color: '#64748b' }}>{card.profileName}</span>
+            </div>
+            <div style={{ textAlign: 'center', marginBottom: '10px' }}>
+              <div style={{ fontSize: `${design.fontSize}px`, color: design.textColor, fontWeight: 'bold', letterSpacing: '1px' }}>
+                {card.code}
+              </div>
+            </div>
+            {design.showSerial && (
+              <div style={{ fontSize: '8px', color: '#94a3b8', position: 'absolute', bottom: '5px', left: '10px' }}>
+                SN: {card.id?.slice(-8)}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

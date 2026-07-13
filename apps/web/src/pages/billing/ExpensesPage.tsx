@@ -8,7 +8,7 @@ export const ExpensesPage: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const { data: expenses = [], isLoading } = useQuery({
+  const { data: expenses = [], isLoading } = useQuery<any[]>({
     queryKey: ['billing', 'expenses'],
     queryFn: () => apiGet('/billing/expenses'),
   });
@@ -19,13 +19,13 @@ export const ExpensesPage: React.FC = () => {
   );
 
   return (
-    <div className="flex-1 p-6 lg:p-8 ml-64 flex flex-col gap-6">
+    <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100 mb-1">المصروفات</h1>
-          <p className="text-slate-400">إدارة وتسجيل مصروفات الشركة</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-100 mb-1">المصروفات</h1>
+          <p className="text-sm sm:text-base text-slate-400">إدارة وتسجيل مصروفات الشركة</p>
         </div>
-        <button onClick={() => setIsAddModalOpen(true)} className="btn-primary shrink-0">
+        <button onClick={() => setIsAddModalOpen(true)} className="btn-primary shrink-0 w-full sm:w-auto justify-center">
           <Plus className="w-4 h-4 mr-2" />
           تسجيل مصروف جديد
         </button>
