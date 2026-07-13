@@ -30,8 +30,7 @@ export class DevicesService {
   }
 
   async create(user: AuthTokenPayload, dto: CreateDeviceDto) {
-    const companyId =
-      user.role === UserRole.SUPER_ADMIN ? dto.companyId : user.companyId;
+    const companyId = dto.companyId || user.companyId;
     if (!companyId) throw new NotFoundException('لم يتم تحديد الشركة');
 
     // Encrypt credentials in the composite "iv:ciphertext" format expected by
