@@ -224,3 +224,4 @@ export class CompaniesService {
 
     return user ?? null;
   }
+}
