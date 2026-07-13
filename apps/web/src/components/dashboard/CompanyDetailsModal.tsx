@@ -2,12 +2,13 @@
 // SIRA PLATFORM v4 - Company Details Modal + WebBox Terminal
 // ============================================================
 import React, { useState, useRef, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { X, Terminal, Router, Wifi, Activity, Send, Loader2 } from 'lucide-react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { X, Terminal, Router, Wifi, Activity, Send, Loader2, KeyRound, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 import { CompanySummary, DeviceSummary, DeviceType, WsEvent } from '@sira/shared';
-import { apiGet } from '../../utils/api';
+import { apiGet, apiPost } from '../../utils/api';
 import { useAuthStore } from '../../stores/auth.store';
+import toast from 'react-hot-toast';
 
 interface CompanyDetailsModalProps {
   company: CompanySummary;
@@ -17,7 +18,7 @@ interface CompanyDetailsModalProps {
 export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
   company, onClose,
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'terminal'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'terminal' | 'password'>('overview');
   const [selectedDevice, setSelectedDevice] = useState<DeviceSummary | null>(null);
   const [terminalLines, setTerminalLines] = useState<string[]>([]);
   const [terminalInput, setTerminalInput] = useState('');
@@ -26,13 +27,47 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
   const [historyIndex, setHistoryIndex] = useState(-1);
   const socketRef = useRef<Socket | null>(null);
   const terminalEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const { accessToken } = useAuthStore();
+
+  // Password reset state
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
 
   const { data: devices = [] } = useQuery<DeviceSummary[]>({
     queryKey: ['god-mode', 'company-devices', company.id],
     queryFn: () => apiGet(`/admin/companies/${company.id}/devices`),
   });
+
+  const { data: adminUser } = useQuery({
+    queryKey: ['god-mode', 'company-admin', company.id],
+    queryFn: () => apiGet(`/admin/companies/${company.id}/admin`),
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: (password: string) =>
+      apiPost(`/admin/companies/${company.id}/reset-password`, { newPassword: password }),
+    onSuccess: () => {
+      toast.success('✓ تم تغيير كلمة المرور بنجاح وإلغاء جميع الجلسات النشطة');
+      setNewPassword('');
+      setConfirmPassword('');
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || 'حدث خطأ أثناء تغيير كلمة المرور');
+    },
+  });
+
+  const handleResetPassword = () => {
+    if (newPassword.length < 6) {
+      toast.error('كلمة المرور يجب أن تكون 6 أحرف على الأقل'); return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('كلمة المرور والتأكيد غير متطابقين'); return;
+    }
+    resetPasswordMutation.mutate(newPassword);
+  };
 
   const mikrotikDevices = devices.filter((d) => d.type === DeviceType.MIKROTIK);
 
@@ -105,6 +140,7 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
 
   const tabs = [
     { id: 'overview', label: 'نظرة عامة' },
+    { id: 'password', label: 'كلمة المرور' },
     { id: 'terminal', label: 'WebBox Terminal' },
   ] as const;
 
@@ -146,6 +182,9 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
               {tab.id === 'terminal' && (
                 <Terminal className="w-3.5 h-3.5 inline ml-1.5" />
               )}
+              {tab.id === 'password' && (
+                <KeyRound className="w-3.5 h-3.5 inline ml-1.5" />
+              )}
               {tab.label}
             </button>
           ))}
@@ -153,6 +192,125 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
+          {/* Password Reset Tab */}
+          {activeTab === 'password' && (
+            <div className="p-6 max-w-md mx-auto">
+              {/* Admin info card */}
+              {adminUser && (
+                <div className="bg-surface-2 rounded-xl p-4 border border-surface-2 mb-6 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-sira-900/50 border border-sira-800/50 flex items-center justify-center flex-shrink-0">
+                    <span className="text-sira-300 font-bold text-sm">
+                      {adminUser.name?.charAt(0)?.toUpperCase() || 'A'}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-200">{adminUser.name || 'مدير الشركة'}</p>
+                    <p className="text-xs text-slate-500 font-mono">{adminUser.email}</p>
+                    {adminUser.lastLoginAt && (
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        آخر دخول: {new Date(adminUser.lastLoginAt).toLocaleString('ar-EG')}
+                      </p>
+                    )}
+                  </div>
+                  <span className={`mr-auto badge ${adminUser.isActive ? 'badge-online' : 'badge-offline'}`}>
+                    {adminUser.isActive ? 'نشط' : 'معطل'}
+                  </span>
+                </div>
+              )}
+
+              {/* Warning */}
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 mb-5 flex gap-2">
+                <ShieldCheck className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-semibold text-amber-300">تنبيه</p>
+                  <p className="text-xs text-amber-400/80 mt-0.5">
+                    تغيير كلمة المرور سيُلغي جميع جلسات الأدمن النشطة حالياً ويُجبره على تسجيل الدخول مجدداً.
+                  </p>
+                </div>
+              </div>
+
+              {/* Form */}
+              <div className="space-y-4">
+                <div>
+                  <label className="input-label">كلمة المرور الجديدة</label>
+                  <div className="relative">
+                    <input
+                      type={showNewPass ? 'text' : 'password'}
+                      className="input pr-10"
+                      placeholder="6 أحرف على الأقل"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      dir="ltr"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPass(!showNewPass)}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                    >
+                      {showNewPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="input-label">تأكيد كلمة المرور</label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPass ? 'text' : 'password'}
+                      className={`input pr-10 ${
+                        confirmPassword && confirmPassword !== newPassword
+                          ? 'border-red-500/50 focus:border-red-500'
+                          : confirmPassword && confirmPassword === newPassword
+                          ? 'border-green-500/50 focus:border-green-500'
+                          : ''
+                      }`}
+                      placeholder="أعد كتابة كلمة المرور"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      dir="ltr"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPass(!showConfirmPass)}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                    >
+                      {showConfirmPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {confirmPassword && confirmPassword !== newPassword && (
+                    <p className="text-xs text-red-400 mt-1">كلمة المرور غير متطابقة</p>
+                  )}
+                  {confirmPassword && confirmPassword === newPassword && (
+                    <p className="text-xs text-green-400 mt-1">✓ كلمة المرور متطابقة</p>
+                  )}
+                </div>
+
+                <button
+                  onClick={handleResetPassword}
+                  disabled={
+                    resetPasswordMutation.isPending ||
+                    !newPassword ||
+                    !confirmPassword ||
+                    newPassword !== confirmPassword
+                  }
+                  className="btn-primary w-full justify-center mt-2"
+                >
+                  {resetPasswordMutation.isPending ? (
+                    <span className="flex items-center gap-2">
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      جارٍ التغيير...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <KeyRound className="w-4 h-4" />
+                      إعادة تعيين كلمة المرور
+                    </span>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Overview Tab */}
           {activeTab === 'overview' && (
             <div className="p-5 space-y-4">

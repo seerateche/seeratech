@@ -1,11 +1,12 @@
 // ============================================================
 // SEERA PLATFORM v4 - Companies / Admin Service
 // ============================================================
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { eq, sql, and } from 'drizzle-orm';
 import { DRIZZLE_TOKEN, DrizzleDB } from '../../database/database.module';
 import { companies, devices, vouchers, users } from '../../database/schema';
 import { CreateCompanyDto } from '@sira/shared';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class CompaniesService {
@@ -164,4 +165,62 @@ export class CompaniesService {
       .returning();
     return created;
   }
-}
+
+  /**
+   * Reset the password of the single admin user belonging to a company.
+   * Only callable by Super Admin (enforced at controller level).
+   */
+  async resetCompanyAdminPassword(companyId: string, newPassword: string): Promise<void> {
+    // Verify company exists
+    const [company] = await this.db
+      .select({ id: companies.id })
+      .from(companies)
+      .where(eq(companies.id, companyId))
+      .limit(1);
+    if (!company) throw new NotFoundException('الشركة غير موجودة');
+
+    // Find the single admin user of this company
+    const [user] = await this.db
+      .select({ id: users.id, email: users.email, role: users.role })
+      .from(users)
+      .where(eq(users.companyId, companyId))
+      .limit(1);
+    if (!user) throw new NotFoundException('لا يوجد مستخدم مرتبط بهذه الشركة');
+
+    if (newPassword.length < 6) {
+      throw new BadRequestException('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await this.db
+      .update(users)
+      .set({ passwordHash, refreshTokenHash: null }) // Invalidate any active sessions
+      .where(eq(users.id, user.id));
+  }
+
+  /**
+   * Get the single admin user info for a company (for display in God Mode).
+   */
+  async getCompanyAdminInfo(companyId: string) {
+    const [company] = await this.db
+      .select({ id: companies.id })
+      .from(companies)
+      .where(eq(companies.id, companyId))
+      .limit(1);
+    if (!company) throw new NotFoundException('الشركة غير موجودة');
+
+    const [user] = await this.db
+      .select({
+        id: users.id,
+        email: users.email,
+        name: users.name,
+        role: users.role,
+        isActive: users.isActive,
+        lastLoginAt: users.lastLoginAt,
+      })
+      .from(users)
+      .where(eq(users.companyId, companyId))
+      .limit(1);
+
+    return user ?? null;
+  }
