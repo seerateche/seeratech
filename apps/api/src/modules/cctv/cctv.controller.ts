@@ -37,7 +37,7 @@ export class CctvController {
     @CurrentUser() user: AuthTokenPayload,
     @Param('deviceId', ParseUUIDPipe) deviceId: string
   ) {
-    await this.cctv.stopStream(deviceId);
+    await this.cctv.stopStream(deviceId, user);
     return { stopped: true };
   }
 

@@ -3,7 +3,7 @@
 // ============================================================
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { DRIZZLE_TOKEN, DrizzleDB } from '../../database/database.module';
 import { devices, attendanceLogs, employees } from '../../database/schema';
 import { SecurityService } from '../../security/security.service';
@@ -219,11 +219,16 @@ export class ZkService {
     zk.on('attendanceRecord', async (record: ZKAttendanceRecord) => {
       try {
         // Get employee name from DB
+        // zkEmployeeId is only unique WITHIN a company, so scope by companyId
+        // to avoid attributing a punch to another tenant's employee.
         const [emp] = await this.db
           .select()
           .from(employees)
           .where(
-            eq(employees.zkEmployeeId, parseInt(record.id) || record.uid),
+            and(
+              eq(employees.companyId, companyId),
+              eq(employees.zkEmployeeId, parseInt(record.id) || record.uid),
+            ),
           )
           .limit(1);
 

@@ -72,6 +72,7 @@ export class VouchersController {
   }
 
   @Get('export-pdf')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.COMPANY_ADMIN)
   async exportPdf(
     @CurrentUser() user: AuthTokenPayload,
     @Query('batchId') batchId: string | undefined,

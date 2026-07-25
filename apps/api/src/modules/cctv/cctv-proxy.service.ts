@@ -83,8 +83,12 @@ export class CctvProxyService {
     );
 
     const host = device.useVpn && device.vpnIp ? device.vpnIp : device.host;
-    // Standard RTSP URL format for most DVR/NVR systems
-    const rtspUrl = `rtsp://${creds.username}:${creds.password}@${host}:${device.port || 554}/Streaming/Channels/101`;
+    // Standard RTSP URL format for most DVR/NVR systems.
+    // URL-encode the credentials so a username/password containing reserved
+    // characters (e.g. '@', '/', ':', '#') does not break the connection URL.
+    const rtspUser = encodeURIComponent(creds.username ?? '');
+    const rtspPass = encodeURIComponent(creds.password ?? '');
+    const rtspUrl = `rtsp://${rtspUser}:${rtspPass}@${host}:${device.port || 554}/Streaming/Channels/101`;
 
     // Create HLS output directory for this stream
     const hlsDir = path.join(this.HLS_BASE_DIR, deviceId);
@@ -121,7 +125,12 @@ export class CctvProxyService {
       .output(hlsPlaylist);
 
     ffmpegCmd.on('start', (cmdLine) => {
-      this.logger.debug(`FFmpeg started: ${cmdLine}`);
+      // Redact rtsp credentials (user:pass@) before logging the command line.
+      const safeCmd = cmdLine.replace(
+        /(rtsp:\/\/)[^@/\s]+@/gi,
+        '$1***:***@',
+      );
+      this.logger.debug(`FFmpeg started: ${safeCmd}`);
     });
 
     ffmpegCmd.on('error', (err, stdout, stderr) => {
@@ -155,7 +164,20 @@ export class CctvProxyService {
     };
   }
 
-  async stopStream(deviceId: string): Promise<void> {
+  async stopStream(deviceId: string, user?: any): Promise<void> {
+    // Enforce tenant isolation: a company-bound user may only stop streams
+    // for devices owned by their own company.
+    if (user && user.role !== 'super_admin') {
+      const [device] = await this.db
+        .select({ companyId: devices.companyId })
+        .from(devices)
+        .where(eq(devices.id, deviceId))
+        .limit(1);
+      if (!device || device.companyId !== user.companyId) {
+        throw new NotFoundException('كاميرا CCTV غير موجودة');
+      }
+    }
+
     const session = this.activeSessions.get(deviceId);
     if (!session) return;
 

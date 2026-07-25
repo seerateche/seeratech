@@ -26,6 +26,7 @@ import {
   IsString,
   MinLength,
 } from 'class-validator';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService, JwtAuthGuard, Public, RolesGuard, Roles } from './auth.service';
 import { CurrentUser } from '../../common/current-user.decorator';
 import { AuthTokenPayload, UserRole } from '@sira/shared';
@@ -79,13 +80,15 @@ export class AuthController {
   // Shows whether the required env vars are present, whether the DB is
   // reachable, which tables exist, and how many users are seeded.
   @Public()
+  @Throttle({ auth: { limit: 5, ttl: 60000 } })
   @Get('debug')
   async debug(@Query('secret') secret?: string) {
-    if (this.config.get('NODE_ENV') === 'production') {
-      const expectedSecret = this.config.get('MIGRATION_SECRET');
-      if (!expectedSecret || secret !== expectedSecret) {
-        throw new UnauthorizedException('Unauthorized');
-      }
+    // Require the migration secret in EVERY environment (not just production).
+    // Without a configured secret the endpoint is fully disabled — it must
+    // never expose the schema/user counts on a public deployment.
+    const expectedSecret = this.config.get<string>('MIGRATION_SECRET');
+    if (!expectedSecret || secret !== expectedSecret) {
+      throw new UnauthorizedException('Unauthorized');
     }
     const checks: Record<string, any> = {};
 
@@ -151,6 +154,7 @@ export class AuthController {
   // Protected by a one-time secret so it can't be abused. Set MIGRATION_SECRET
   // in the API service, then: POST /api/v1/auth/run-migrations  {"secret":"..."}
   @Public()
+  @Throttle({ auth: { limit: 5, ttl: 60000 } })
   @Post('run-migrations')
   @HttpCode(HttpStatus.OK)
   async runMigrations(@Body() body: { secret?: string }) {
@@ -178,7 +182,14 @@ export class AuthController {
     try {
       const bcrypt = await import('bcryptjs');
       const email = this.config.get<string>('SEED_SUPER_ADMIN_EMAIL') || 'superadmin@seera.local';
-      const pwd   = this.config.get<string>('SEED_SUPER_ADMIN_PASSWORD') || 'Change_Me_2025!';
+      const pwd   = this.config.get<string>('SEED_SUPER_ADMIN_PASSWORD');
+      // Never fall back to a hard-coded default password — that would create a
+      // publicly-known super-admin credential. Require it to be set explicitly.
+      if (!pwd || pwd.length < 12) {
+        out.superAdmin =
+          'skipped: set SEED_SUPER_ADMIN_PASSWORD (min 12 chars) to seed the super admin';
+        return out;
+      }
       const existing = await this.db.execute(
         sql`SELECT 1 FROM users WHERE email = ${email} LIMIT 1`,
       );
@@ -200,6 +211,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ auth: { limit: 10, ttl: 60000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login with email + password' })
@@ -208,6 +220,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ auth: { limit: 10, ttl: 60000 } })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access token using a refresh token' })
