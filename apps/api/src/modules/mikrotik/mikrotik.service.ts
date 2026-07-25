@@ -651,11 +651,67 @@ export class MikroTikService implements OnModuleDestroy {
     const device = await this.assertDeviceOwned(deviceId, user);
     const api = await this.getConnection(deviceId, device);
 
-    const BLOCKED = ['/system/reset-configuration', '/system/format-storage'];
-    const norm    = command.trim().toLowerCase().replace(/\s+/g, '/');
-    for (const blocked of BLOCKED) {
+    const norm = command.trim().toLowerCase().replace(/\s+/g, '/');
+
+    // Always-blocked: irreversible / destructive router operations that no
+    // role should run from the web terminal.
+    const HARD_BLOCKED = [
+      '/system/reset-configuration',
+      '/system/format-storage',
+      '/system/routerboard/upgrade',
+      '/system/routerboard/downgrade',
+      '/system/package/downgrade',
+      '/system/reset',
+    ];
+    for (const blocked of HARD_BLOCKED) {
       if (norm.includes(blocked)) {
         return { output: '', error: '⛔ هذا الأمر محظور لأسباب أمنية' };
+      }
+    }
+
+    // Elevated commands: high-impact operations that require SUPER_ADMIN.
+    // A regular COMPANY_ADMIN can manage the router but cannot reboot it,
+    // flash firmware, wipe users, alter the firewall/routing/DNS, exfiltrate
+    // via /tool/fetch, or install persistence (scripts/schedulers) from the
+    // web terminal.
+    //
+    // NOTE (interim): this is still an expanded DENYLIST, not an allowlist.
+    // A future hardening pass should switch to an explicit allowlist of the
+    // safe read/monitoring commands the terminal actually needs.
+    const ELEVATED = [
+      // ── Firmware / lifecycle
+      '/system/reboot',
+      '/system/shutdown',
+      '/system/package',
+      '/system/upgrade',
+      // ── Local users / auth
+      '/user/remove',
+      '/user/reset',
+      '/user/add',
+      '/user/set',
+      // ── Persistence vectors (scripts + schedulers)
+      '/system/script',
+      '/system/scheduler',
+      // ── Outbound data / exfiltration
+      '/tool/fetch',
+      // ── Firewall / NAT / address-list mutations
+      '/ip/firewall',
+      // ── DNS hijack / static entries
+      '/ip/dns/set',
+      '/ip/dns/static',
+      // ── RADIUS (auth backend) tampering
+      '/radius/add',
+      '/radius/remove',
+      '/radius/set',
+    ];
+    if (user && user.role !== UserRole.SUPER_ADMIN) {
+      for (const guarded of ELEVATED) {
+        if (norm.includes(guarded)) {
+          return {
+            output: '',
+            error: '⛔ هذا الأمر يتطلب صلاحية المدير العام (Super Admin)',
+          };
+        }
       }
     }
 

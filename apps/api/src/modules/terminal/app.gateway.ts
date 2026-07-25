@@ -22,14 +22,17 @@ import { DRIZZLE_TOKEN, DrizzleDB } from '../../database/database.module';
 import { terminalSessions, users } from '../../database/schema';
 import { MikroTikService } from '../mikrotik/mikrotik.service';
 import { AuthTokenPayload, UserRole, WsEvent } from '@sira/shared';
+import { createCorsOriginValidator } from '../../common/cors-origin';
 
 interface AuthenticatedSocket extends Socket {
   user: AuthTokenPayload;
 }
 
 @WebSocketGateway({
+  // Apply the SAME origin allow-list used by the REST server instead of a
+  // blanket wildcard, so the WebSocket honours CORS_ORIGINS / platform flags.
   cors: {
-    origin: '*',
+    origin: createCorsOriginValidator(),
     credentials: true,
   },
   namespace: '/ws',

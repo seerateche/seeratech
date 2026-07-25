@@ -6,6 +6,8 @@
     "dev": "nest start --watch",
     "prebuild": "cd ../../packages/shared && npm run build",
     "build": "nest build",
+    "test": "jest",
+    "test:watch": "jest --watch",
     "start": "node dist/main.js",
     "start:prod": "node dist/database/migrate.js && node dist/main.js",
     "db:init": "node dist/database/migrate.js",
@@ -72,5 +74,15 @@
     "ts-jest": "^29.1.2",
     "typescript": "^5.3.3",
     "ts-node": "^10.9.2"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "moduleFileExtensions": ["js", "json", "ts"],
+    "moduleNameMapper": {
+      "^@sira/shared$": "<rootDir>/../../../packages/shared/src/index.ts"
+    }
   }
 }

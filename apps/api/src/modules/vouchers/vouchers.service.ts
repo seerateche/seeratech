@@ -116,11 +116,19 @@ export class VouchersService {
   async exportPdf(user: AuthTokenPayload, batchId?: string): Promise<Buffer> {
     const companyId = this.scope(user);
 
-    const baseWhere = batchId
-      ? eq(vouchers.batchId, batchId)
-      : companyId
-        ? eq(vouchers.companyId, companyId)
-        : undefined;
+    // Always scope by company (when the caller is company-bound) so a
+    // batchId belonging to another tenant can never be exported.
+    const conditions = [
+      batchId ? eq(vouchers.batchId, batchId) : undefined,
+      companyId ? eq(vouchers.companyId, companyId) : undefined,
+    ].filter(Boolean) as any[];
+
+    const baseWhere =
+      conditions.length === 0
+        ? undefined
+        : conditions.length === 1
+          ? conditions[0]
+          : and(...conditions);
 
     const rows = baseWhere
       ? await this.db.select().from(vouchers).where(baseWhere).limit(1000)

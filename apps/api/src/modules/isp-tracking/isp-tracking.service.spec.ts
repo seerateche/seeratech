@@ -11,7 +11,6 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
-  InternalServerErrorException,
 } from '@nestjs/common';
 
 // ── Mock factories ────────────────────────────────────────────
@@ -42,6 +41,26 @@ const mockSecurity = {
 const mockWeClient = {
   login:       jest.fn(),
   fetchQuota:  jest.fn(),
+  // Since PR #19 the service falls back to clearly-labelled DEMO data when a
+  // live WE sync fails AND ISP_MOCK_FALLBACK is enabled (the default). The
+  // returned shape mirrors WeApiClient.buildMockAccountInfo().
+  buildMockAccountInfo: jest.fn().mockReturnValue({
+    accountNumber:  '01000000000',
+    subscriberName: 'عميل WE (بيانات تجريبية)',
+    lineStatus:     'Active',
+    planName:       'WE Space Super 250GB (تجريبي)',
+    bundles: [
+      {
+        bundleName:     'Main Quota',
+        totalValue:     250,
+        usedValue:      115,
+        remainingValue: 135,
+        unit:           'GB',
+        expiryDate:     new Date(Date.now() + 15 * 86400000).toISOString(),
+        isMainBundle:   true,
+      },
+    ],
+  }),
 };
 
 const COMPANY_ID  = 'comp-111';
@@ -72,6 +91,19 @@ describe('IspTrackingService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    // Re-establish the chainable query-builder defaults. jest.clearAllMocks()
+    // wipes the mockReturnThis() implementations set at module load, so every
+    // chained builder method must be restored here or a later test that
+    // overrides one method (e.g. .where) can permanently break the chain.
+    mockDb.select.mockReturnThis();
+    mockDb.from.mockReturnThis();
+    mockDb.where.mockReturnThis();
+    mockDb.insert.mockReturnThis();
+    mockDb.values.mockReturnThis();
+    mockDb.update.mockReturnThis();
+    mockDb.set.mockReturnThis();
+    mockDb.delete.mockReturnThis();
+    mockDb.orderBy.mockReturnThis();
     // Default: no existing accounts
     mockDb.limit.mockResolvedValue([]);
     mockDb.returning.mockResolvedValue([MOCK_ACCOUNT]);
@@ -192,7 +224,11 @@ describe('IspTrackingService', () => {
       expect(result.quotaDetails.usagePercent).toBe(72);
     });
 
-    it('stores Arabic error message on WE API failure', async () => {
+    it('falls back to DEMO data and stores Arabic error on WE API failure (mock fallback enabled)', async () => {
+      // With ISP_MOCK_FALLBACK enabled (the default), a live WE failure does
+      // NOT throw — the service returns clearly-labelled demo data (isMock)
+      // and records the Arabic error in lastError with a "بيانات تجريبية"
+      // prefix. This is the honest behavior shipped in PR #19.
       const weError: any = new Error('كلمة المرور أو رقم الهاتف غير صحيح');
       weError.isWeError = true;
       weError.code      = 'INVALID_CREDENTIALS';
@@ -200,18 +236,23 @@ describe('IspTrackingService', () => {
 
       mockDb.returning.mockResolvedValue([{
         ...MOCK_ACCOUNT,
-        status:    'error',
-        lastError: 'كلمة المرور أو رقم الهاتف غير صحيح',
+        status:    'active',
+        lastError: 'بيانات تجريبية — تعذّر الاتصال الفعلي: كلمة المرور أو رقم الهاتف غير صحيح',
       }]);
 
       await expect(
         service.syncAccountQuota(ACCOUNT_ID, COMPANY_ID),
-      ).rejects.toThrow(InternalServerErrorException);
+      ).resolves.toBeDefined();
 
-      // Verify Arabic error was written to DB
+      // The mock fallback path was taken.
+      expect(mockWeClient.buildMockAccountInfo).toHaveBeenCalled();
+
+      // Verify the Arabic error was written to DB (with the demo prefix).
+      // The mock-fallback path keeps status 'active' and carries the failure
+      // reason in lastError prefixed with "بيانات تجريبية".
       expect(mockDb.set).toHaveBeenCalledWith(
         expect.objectContaining({
-          status:    'error',
+          status:    'active',
           lastError: expect.stringContaining('كلمة المرور'),
         }),
       );
@@ -262,8 +303,9 @@ describe('IspTrackingService', () => {
   describe('deleteAccount', () => {
     it('deletes existing account', async () => {
       mockDb.limit.mockResolvedValue([{ id: ACCOUNT_ID }]);
-      mockDb.delete.mockReturnThis();
-      mockDb.where.mockResolvedValue(undefined);
+      // NOTE: do NOT override mockDb.where here — it must stay chainable so
+      // assertExists() can run .where().limit(1). The delete builder's return
+      // value is not consumed by the service.
 
       await expect(
         service.deleteAccount(ACCOUNT_ID, COMPANY_ID),

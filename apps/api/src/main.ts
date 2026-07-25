@@ -49,11 +49,11 @@ async function bootstrap() {
   //  - Requests with no Origin header (curl, mobile apps, health checks,
   //    same-origin) are allowed.
   //  - Set CORS_ALLOW_ALL=true to allow every origin (use only for debugging).
-  const { origins: corsOrigins, allowAll } = getCorsConfig();
+  const { origins: corsOrigins, allowAll, allowPlatformSubdomains } = getCorsConfig();
 
   app.enableCors({
     origin: (origin, callback) => {
-      if (isOriginAllowed(origin, corsOrigins, allowAll)) {
+      if (isOriginAllowed(origin, corsOrigins, allowAll, allowPlatformSubdomains)) {
         return callback(null, true);
       }
       logger.warn(`🚫 CORS blocked origin: ${origin}`);
@@ -65,8 +65,8 @@ async function bootstrap() {
   });
   logger.log(
     `🌐 CORS allow-list: ${corsOrigins.join(', ') || '(none)'}${
-      allowAll ? ' + ALL (debug)' : ' + *.railway.app'
-    }`,
+      allowAll ? ' + ALL (debug)' : ''
+    }${allowPlatformSubdomains ? ' + *.run.app/*.railway.app' : ''}`,
   );
 
   // ── Global Pipes ──────────────────────────────────────────
