@@ -9,6 +9,7 @@ import axios, {
   AxiosError,
   AxiosRequestConfig,
 } from 'axios';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 
 // ── API response shapes ───────────────────────────────────────
 
@@ -84,6 +85,35 @@ export class WeApiClient {
   };
 
   private readonly http: AxiosInstance;
+
+  // ── Landline (ADSL) real-quota scraper ───────────────────────
+  // The WE *landline* portal authenticates with a portal
+  // username/password (NOT mobile OTP), which is why a headless
+  // scrape of it returns real quota reliably. We POST the credentials
+  // to a scraper microservice that logs into the portal and returns
+  // parsed usage.
+  //
+  //   POST <WE_SCRAPER_URL>
+  //   body: { phoneNumber, username, password, provider }
+  //   ->   { planName, totalGB, usedGB, remainingGB, percent,
+  //          renewalDate, lineStatus, balance }
+  //
+  // WE blocks datacenter IPs, so real scraping requires an Egyptian
+  // residential/mobile egress. WE_SCRAPER_PROXY_URL routes the request
+  // through such a proxy. Without a configured scraper URL the landline
+  // path is disabled and the caller falls back to labelled demo data.
+  private readonly SCRAPER_URL =
+    process.env.WE_SCRAPER_URL?.trim() || '';
+  private readonly SCRAPER_PROXY_URL =
+    process.env.WE_SCRAPER_PROXY_URL?.trim() || '';
+  private readonly SCRAPER_TIMEOUT_MS = Number(
+    process.env.WE_SCRAPER_TIMEOUT_MS ?? 45_000,
+  );
+
+  /** True when a landline scraper endpoint is configured. */
+  get landlineScraperEnabled(): boolean {
+    return this.SCRAPER_URL.length > 0;
+  }
 
   constructor() {
     this.http = axios.create({
@@ -221,6 +251,122 @@ export class WeApiClient {
       this.logger.warn(`WE API quota fetch failed: ${err?.message ?? 'unknown'}`);
       throw this.mapAxiosError(err);
     }
+  }
+
+  // ── Landline (ADSL) Real Quota via Scraper ───────────────────
+
+  /**
+   * Fetches REAL landline quota by POSTing the portal credentials to the
+   * configured scraper microservice. Returns a WeAccountInfo so it flows
+   * through the same transformAccountInfo() path as the mobile API.
+   *
+   * @throws a WE-mapped error (isWeError) on any failure, so the caller can
+   *         decide whether to surface it or fall back to labelled demo data.
+   */
+  async fetchLandlineQuota(params: {
+    phoneNumber: string;
+    username:    string;
+    password:    string;
+    provider?:   string;
+  }): Promise<WeAccountInfo> {
+    if (!this.landlineScraperEnabled) {
+      // No scraper configured — caller falls back to demo data.
+      throw this.makeError('SERVICE_UNAVAILABLE');
+    }
+
+    const reqConfig: AxiosRequestConfig = {
+      timeout: this.SCRAPER_TIMEOUT_MS,
+      headers: { 'Content-Type': 'application/json' },
+      validateStatus: (status) => status < 500,
+    };
+
+    // Route through an Egyptian egress proxy when configured. WE blocks
+    // datacenter IPs, so without this the scrape will almost always fail.
+    if (this.SCRAPER_PROXY_URL) {
+      const agent = new HttpsProxyAgent(this.SCRAPER_PROXY_URL);
+      reqConfig.httpAgent  = agent;
+      reqConfig.httpsAgent = agent;
+      // Let the proxy agent handle the tunnel, not axios' proxy option.
+      reqConfig.proxy = false;
+    } else {
+      this.logger.warn(
+        'WE_SCRAPER_PROXY_URL is not set — landline scrape will use the ' +
+        'server IP directly and will likely be blocked by WE.',
+      );
+    }
+
+    try {
+      const res = await axios.post(
+        this.SCRAPER_URL,
+        {
+          phoneNumber: params.phoneNumber,
+          username:    params.username || params.phoneNumber,
+          password:    params.password,
+          provider:    params.provider || 'WE',
+        },
+        reqConfig,
+      );
+
+      if (res.status === 401 || res.status === 403) {
+        throw this.makeError('INVALID_CREDENTIALS');
+      }
+      if (res.status === 429) {
+        throw this.makeError('RATE_LIMITED');
+      }
+
+      const data = res.data?.data ?? res.data;
+      if (!data || !data.planName) {
+        this.logger.warn(
+          `Landline scrape returned no plan for ${params.phoneNumber}: ` +
+          `${JSON.stringify(data).slice(0, 200)}`,
+        );
+        throw this.makeError('UNEXPECTED_RESPONSE');
+      }
+
+      return this.mapLandlineResponse(data, params.phoneNumber);
+    } catch (err: any) {
+      if (err?.isWeError) throw err;
+      this.logger.warn(
+        `Landline scrape failed for ${params.phoneNumber}: ${err?.message ?? 'unknown'}`,
+      );
+      throw this.mapAxiosError(err);
+    }
+  }
+
+  /**
+   * Maps the scraper's landline response into the shared WeAccountInfo
+   * shape. Tolerant of both camelCase and PascalCase keys, since the
+   * upstream response is not a formally-versioned contract.
+   */
+  private mapLandlineResponse(raw: any, phoneNumber: string): WeAccountInfo {
+    const num = (v: any): number => {
+      const n = parseFloat(v);
+      return Number.isFinite(n) ? n : 0;
+    };
+
+    const totalGb = num(raw.totalGB ?? raw.totalGb ?? raw.total);
+    const usedGb  = num(raw.usedGB  ?? raw.usedGb  ?? raw.used);
+    const remainingGb = raw.remainingGB ?? raw.remainingGb ?? raw.remaining;
+    const remaining = remainingGb != null ? num(remainingGb) : Math.max(0, totalGb - usedGb);
+    const expiry = raw.renewalDate ?? raw.RenewalDate ?? raw.expiryDate ?? raw.expiry ?? '';
+
+    return {
+      accountNumber:  String(raw.accountNumber ?? raw.phoneNumber ?? phoneNumber),
+      subscriberName: String(raw.subscriberName ?? raw.name ?? ''),
+      lineStatus:     String(raw.lineStatus ?? raw.status ?? 'Active'),
+      planName:       String(raw.planName),
+      bundles: [
+        {
+          bundleName:     'Main Quota',
+          totalValue:     totalGb,
+          usedValue:      usedGb,
+          remainingValue: remaining,
+          unit:           'GB',
+          expiryDate:     expiry ? new Date(expiry).toISOString() : '',
+          isMainBundle:   true,
+        },
+      ],
+    };
   }
 
   // ── Demo / Placeholder Data ──────────────────────────────────
