@@ -236,6 +236,47 @@ export class IspTrackingService {
         tag: account.credentialTag,
       });
 
+      // ── Landline (ADSL) path ────────────────────────────────
+      // WE landline accounts authenticate against the portal with a
+      // username/password (no OTP), so we fetch REAL quota via the
+      // scraper microservice instead of the mobile OAuth flow. This
+      // only runs when a scraper URL is configured; otherwise it throws
+      // and the outer catch falls back to labelled demo data.
+      const isLandline =
+        account.provider === 'we_landline' ||
+        account.provider === 'we_adsl';
+
+      if (isLandline && this.weClient.landlineScraperEnabled) {
+        this.logger.log(`Fetching LIVE landline quota for ${account.phoneNumber}`);
+        const accountInfo = await this.weClient.fetchLandlineQuota({
+          phoneNumber: account.phoneNumber,
+          username:    account.phoneNumber, // portal username == line number
+          password,
+          provider:    'WE',
+        });
+
+        const quotaDetails = this.transformAccountInfo(accountInfo, 'live');
+
+        const [updated] = await this.db
+          .update(ispAccounts)
+          .set({
+            status:       'active',
+            quotaDetails,
+            lastSyncedAt: new Date(),
+            lastError:    null,
+            updatedAt:    new Date(),
+          })
+          .where(eq(ispAccounts.id, id))
+          .returning();
+
+        this.logger.log(
+          `✓ Synced LIVE landline quota for ${account.phoneNumber}: ` +
+          `${quotaDetails.usedGb}/${quotaDetails.totalGb} GB (${quotaDetails.usagePercent}%)`,
+        );
+
+        return this.toPublic(updated);
+      }
+
       // 2. Check cached session token
       let token: string | null = null;
       let accountId = '';
